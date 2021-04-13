@@ -1,7 +1,7 @@
 #Pine invasion project
 
 
-path<- setwd("/project/bi594/Pine_invasion/batch1/")
+path <- setwd("/project/bi594/Pine_invasion/batch1/")
 
 
 fns <- list.files(path)
@@ -22,9 +22,12 @@ library(ggplot2); #packageVersion("ggplot2")
 library(phyloseq); #packageVersion("phyloseq")
 
 #Set path to unzipped, renamed fastq files
+
 setwd("/project/bi594/Pine_invasion/batch1/")
 path <- "/project/bi594/Pine_invasion/batch1/"
+
 fns <- list.files(path)
+
 #Let's make sure that all of our files are there
 fns
 
@@ -32,48 +35,59 @@ fns
 ##### Trimming/Filtering #######
 ################################
 
-fastqs <- fns[grepl(".fastq$", fns)]
-fastqs <- sort(fastqs) # Sort ensures reads are in same order
-#fnFs <- fastqs[grepl("_R1", fastqs)] # Just the forward read files- these are old 454 data but most data are paired end
-
-# Get sample names, assuming files named as so: SAMPLENAME_XXX.fastq; OTHERWISE MODIFY
-sample.names <- sapply(strsplit(fastqs, ".fastq"), `[`, 1) #the last number will select the field for renaming
-sample.names
-# Specify the full path to the fnFs
-fnFs <- file.path(path, fastqs)
-fnFs
+fastqs <- fns[grepl(".fastq.gz", fns)]
+fastqs <- sort(fastqs)
+fnFs <- fastqs[grepl("_R1", fastqs)]
+fnRs <- fastqs[grepl("_R2", fastqs)]
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) #simplifying name
 
 #########Visualize Raw data
 
 #First, lets look at quality profile of R1 reads
 ##visualize quality score - this is where you can decide to visually create a quality cutoff of "X"
-##eg. in first plot, would want to cutoff above ~20
+##Quality scores largely drop below 20 around 250 reads in the forward reads, and around 200 in the reverse reads
 ##x axis "cycle" = bp length (reads = no. basepairs)
 plotQualityProfile(fnFs[c(1,2,3,4,5,6,7,8,9)])
 plotQualityProfile(fnFs[c(10,11,12,13,14,15,16,17,18)])
 plotQualityProfile(fnFs[c(19,20,21,22,23,24,25,26,27)])
 plotQualityProfile(fnFs[c(28,29,30,31,32,33,34,35)])
-plotQualityProfile(fnFs[c(36,37,38,39,40,41)])
-
-#Recommend trimming where quality profile crashes - in this case, forward reads mostly fine up to 300
-#For common ITS amplicon strategies with paired end reads, it is undesirable to truncate reads to a fixed length due to the large amount of length variation at that locus. That is OK, just leave out truncLen. Make sure you removed the forward and reverse primers from both the forward and reverse reads though! 
+plotQualityProfile(fnFs[c(36,37,38,39,40,41,42,43)])
+plotQualityProfile(fnFs[c(50:59)])
+plotQualityProfile(fnRs[c(50:59)])
 
 #Make directory and filenames for the filtered fastqs
 filt_path <- file.path(path, "trimmed")
 if(!file_test("-d", filt_path)) dir.create(filt_path)
-filtFs <- file.path(filt_path, paste0(sample.names, "_F_filt.fastq.gz"))
+filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+names(filtFs) <- sample.names
+names(filtRs) <- sample.names
 
-# Filter
-out <- filterAndTrim(fnFs, filtFs, truncLen= 300, #end of single end reads = approx. 300 bp
+#Find out if we need to remove primer
+primerF<-grep("TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG", "RV238_S210_L001_R1_001.fastq.gz")
+primerF
+#integer(0) - primer was not found, has already been filtered! Also confirmed in the SCC terminal 
+
+# Filter forward reads
+outF <- filterAndTrim(fnFs, filtFs, truncLen= 250, #end of single end reads = approx. 250 bp
                      maxN=0, #DADA does not allow Ns - filter out Ns (degenerate base)
                      maxEE=1, #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
                      truncQ=2, 
-                     trimLeft=20, #N nucleotides to remove from the start of each read: ITS2 primer = F 20bp
                      rm.phix=TRUE, #remove reads matching phiX genome
                      compress=TRUE, multithread=FALSE) # On Windows set multithread=FALSE
 
-head(out)
-#3789 was the number we saw in the grep terminal for that file -- sanity check yourself
+head(outF)
+
+#Filter reverse reads
+outR <- filterAndTrim(fnRs, filtRs, truncLen= 200, #end of single end reads = approx. 300 bp
+                      maxN=0, #DADA does not allow Ns - filter out Ns (degenerate base)
+                      maxEE=1, #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
+                      truncQ=2, 
+                      rm.phix=TRUE, #remove reads matching phiX genome
+                      compress=TRUE, multithread=FALSE) # On Windows set multithread=FALSE
+
+head(outR)
+
 #reads.out=no. of reads you lost--normal if numbers look less than here, that's normal (about 50% of reads lost??)
 tail(out)
 
