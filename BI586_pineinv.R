@@ -1,7 +1,11 @@
 #Pine invasion project
+#Loading in env. 
+setwd("/project/bi594/Pine_invasion/")
+load('Environment4.13.21.RData')
 
 
 path <- setwd("/project/bi594/Pine_invasion/batch1/")
+
 
 
 fns <- list.files(path)
@@ -39,7 +43,7 @@ fastqs <- fns[grepl(".fastq.gz", fns)]
 fastqs <- sort(fastqs)
 fnFs <- fastqs[grepl("_R1", fastqs)]
 fnRs <- fastqs[grepl("_R2", fastqs)]
-sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) #simplifying name
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) #getting sample names 
 
 #########Visualize Raw data
 
@@ -47,19 +51,27 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) #simplifying name
 ##visualize quality score - this is where you can decide to visually create a quality cutoff of "X"
 ##Quality scores largely drop below 20 around 250 reads in the forward reads, and around 200 in the reverse reads
 ##x axis "cycle" = bp length (reads = no. basepairs)
-plotQualityProfile(fnFs[c(1,2,3,4,5,6,7,8,9)])
-plotQualityProfile(fnFs[c(10,11,12,13,14,15,16,17,18)])
-plotQualityProfile(fnFs[c(19,20,21,22,23,24,25,26,27)])
-plotQualityProfile(fnFs[c(28,29,30,31,32,33,34,35)])
-plotQualityProfile(fnFs[c(36,37,38,39,40,41,42,43)])
-plotQualityProfile(fnFs[c(50:59)])
-plotQualityProfile(fnRs[c(50:59)])
+plotQualityProfile(fnFs[c(1:9)])
+plotQualityProfile(fnFs[c(10:18)])
+plotQualityProfile(fnFs[c(19:27)])
+plotQualityProfile(fnFs[c(28:35)])
+plotQualityProfile(fnFs[c(36:44)])
+plotQualityProfile(fnFs[c(45:53)])
+plotQualityProfile(fnFs[c(54:59)])
+
+plotQualityProfile(fnRs[c(1:9)])
+plotQualityProfile(fnRs[c(10:18)])
+plotQualityProfile(fnRs[c(19:27)])
+plotQualityProfile(fnRs[c(28:35)])
+plotQualityProfile(fnRs[c(36:44)])
+plotQualityProfile(fnRs[c(45:53)])
+plotQualityProfile(fnRs[c(54:59)])
 
 #Make directory and filenames for the filtered fastqs
 filt_path <- file.path(path, "trimmed")
 if(!file_test("-d", filt_path)) dir.create(filt_path)
-filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
-filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+filtFs <- file.path(path, "Filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(path, "Filtered", paste0(sample.names, "_R_filt.fastq.gz"))
 names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 
@@ -67,29 +79,33 @@ names(filtRs) <- sample.names
 primerF<-grep("TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG", "RV238_S210_L001_R1_001.fastq.gz")
 primerF
 #integer(0) - primer was not found, has already been filtered! Also confirmed in the SCC terminal 
+primerR<-grep("TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG", "RV238_S210_L001_R2_001.fastq.gz")
+primerR
 
 # Filter forward reads
-outF <- filterAndTrim(fnFs, filtFs, truncLen= 250, #end of single end reads = approx. 250 bp
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen= c(250,200), #end of single end reads = approx. 250 bp
                      maxN=0, #DADA does not allow Ns - filter out Ns (degenerate base)
-                     maxEE=1, #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
+                     maxEE= c(2,2), #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
                      truncQ=2, 
                      rm.phix=TRUE, #remove reads matching phiX genome
                      compress=TRUE, multithread=FALSE) # On Windows set multithread=FALSE
 
-head(outF)
-
-#Filter reverse reads
-outR <- filterAndTrim(fnRs, filtRs, truncLen= 200, #end of single end reads = approx. 300 bp
-                      maxN=0, #DADA does not allow Ns - filter out Ns (degenerate base)
-                      maxEE=1, #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
-                      truncQ=2, 
-                      rm.phix=TRUE, #remove reads matching phiX genome
-                      compress=TRUE, multithread=FALSE) # On Windows set multithread=FALSE
-
-head(outR)
-
-#reads.out=no. of reads you lost--normal if numbers look less than here, that's normal (about 50% of reads lost??)
+# reads.out = Number of reads remaining after filtering with quality scores 
+#reads.out look good. Retaining more than 50% reads 
+head(out)
 tail(out)
+#Must filter reads together to prevent mis-match sorting that can affect merging of forward and reverse reads 
+
+#Filter reverse reads #
+#outR <- filterAndTrim(fnRs, filtRs, truncLen= 200, #end of single end reads = approx. 300 bp
+                      #maxN=0, #DADA does not allow Ns - filter out Ns (degenerate base)
+                      #maxEE=1, #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
+                      #truncQ=2, 
+                      #rm.phix=TRUE, #remove reads matching phiX genome
+                      #compress=TRUE, multithread=FALSE) # On Windows set multithread=FALSE
+
+
+
 
 #A word on Expected Errors vs a blanket quality threshold
 #Take a simple example: a read of length two with quality scores Q3 and Q40, corresponding to error probabilities P=0.5 and P=0.0001. The base with Q3 is much more likely to have an error than the base with Q40 (0.5/0.0001 = 5,000 times more likely), so we can ignore the Q40 base to a good approximation. Consider a large sample of reads with (Q3, Q40), then approximately half of them will have an error (because of the P=0.5 from the Q2 base). We express this by saying that the expected number of errors in a read with quality scores (Q3, Q40) is 0.5.
@@ -101,8 +117,12 @@ tail(out)
 #DADA2 learns its error model from the data itself by alternating estimation of the error rates and the composition of the sample until they converge on a jointly consistent solution (this is similar to the E-M algorithm)
 #As in many optimization problems, the algorithm must begin with an initial guess, for which the maximum possible error rates in this data are used (the error rates if only the most abundant sequence is correct and all the rest are errors).
 
-setDadaOpt(MAX_CONSIST=30) #increase number of cycles to allow convergence
+setDadaOpt(MAX_CONSIST=30) #set higher to allow more cycles for convergence
 errF <- learnErrors(filtFs, multithread=TRUE)
+#102956500 bases in 411826 reads from 14 samples 
+#output is list of 3, does this mean convergence after 3 rounds? 
+errR <- learnErrors(filtRs, multithread=TRUE)
+#112129600 bases in 560648 reads from 16 samples 
 #Maximum cycles was set to 30, but Convergence was found after 4 rounds
 #errF may take a long time 
 
@@ -112,7 +132,9 @@ errF <- learnErrors(filtFs, multithread=TRUE)
 #black line is estimated error rate after convergence
 #dots are observed error rate for each quality score
 
-plotErrors(errF, nominalQ=TRUE) 
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+#error rates look relatively okay, not strictly linear but definitely a negative correlation 
 
 ################################
 ##### Dereplicate reads #######
@@ -120,26 +142,39 @@ plotErrors(errF, nominalQ=TRUE)
 #Dereplication combines all identical sequencing reads into “unique sequences” with a corresponding “abundance”: the number of reads with that unique sequence. 
 #Dereplication substantially reduces computation time by eliminating redundant comparisons.
 #DADA2 retains a summary of the quality information associated with each unique sequence. The consensus quality profile of a unique sequence is the average of the positional qualities from the dereplicated reads. These quality profiles inform the error model of the subsequent denoising step, significantly increasing DADA2’s accuracy.
-derepFs <- derepFastq(filtFs, verbose=TRUE)
+derepFs <- derepFastq(filtFs, verbose=FALSE)
+derepRs <- derepFastq(filtRs, verbose=FALSE)
 # Name the derep-class objects by the sample names
-names(derepFs) <- sample.names
-
+names(derepFs) <-sample.names
+names(derepRs) <-sample.names
 ################################
 ##### Infer Sequence Variants #######
 ################################
 
+#Performing Joint sample inference 
 #Must change some of the DADA options b/c original program optomized for ribosomal data, not ITS - from github, "We currently recommend BAND_SIZE=32 for ITS data." leave as default for 16S/18S
-setDadaOpt(BAND_SIZE=32)
+setDadaOpt(BAND_SIZE=32) #Keep set at 32 for ITS analysis 
 dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
+dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
 
 #now, look at the dada class objects by sample
 #will tell how many 'real' variants in unique input seqs
 #By default, the dada function processes each sample independently, but pooled processing is available with pool=TRUE and that may give better results for low sampling depths at the cost of increased computation time. See our discussion about pooling samples for sample inference. 
-dadaFs[[1]] #looking at number of sequence variants found; 6 here
-dadaFs[[25]]
+dadaFs[[1]] #looking at number of sequence variants found; 
+#90 sequence variants inferred from 1856 input sequences 
+dadaRs[[1]]
+#78 sequence variants inferred from 2184 input sequences 
+
+#merging paired ends of forward and reverse reads for full sequences 
+mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=FALSE)
+head(mergers[[1]])
+#originally not successfully merging, $maps were different lengths because sorted separately 
+#maybe ask Sarah and James about this output? 
+
 
 #construct sequence table
-seqtab <- makeSequenceTable(dadaFs)
+seqtab <- makeSequenceTable(mergers) #INPUT for WGCNA? 
+dim(seqtab) #4887 sequence variants? 
 head(seqtab) #gives sequence, then number of that sequence found in each sample
 
 ################################
@@ -152,15 +187,17 @@ head(seqtab) #gives sequence, then number of that sequence found in each sample
 
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
-# Identified 1 bimeras out of 117 input sequences.
+# Identified 63 bimeras out of 4887 input sequences (~1.3%)
+table(nchar(getSequences(seqtab.nochim))) #distribution of sequence lengths 
 
-sum(seqtab.nochim)/sum(seqtab)
+sum(seqtab.nochim)/sum(seqtab) #.999107 
 #The fraction of chimeras varies based on factors including experimental procedures and sample complexity, 
 #Most of your reads should remain after chimera removal (it is not uncommon for a majority of sequence variants to be removed though)
 #For our sample, this ratio was 0.9998201, there was only 1 bimera
 
-write.csv(seqtab,file="Alizah_seqtab.csv")
-write.csv(seqtab.nochim,file="Alizah_nochim.csv")
+setwd('/project/bi594/Pine_invasion/')
+write.csv(seqtab,file="pineinvasion_seqtab.csv")
+write.csv(seqtab.nochim,file="pineinvasion_nochim.csv")
 ################################
 ##### Track Read Stats #######
 ################################
@@ -168,7 +205,7 @@ write.csv(seqtab.nochim,file="Alizah_nochim.csv")
 getN <- function(x) sum(getUniques(x))
 track <- cbind(out, sapply(dadaFs, getN), sapply(dadaFs, getN), rowSums(seqtab), rowSums(seqtab.nochim))
 colnames(track) <- c("input", "filtered", "denoised", "merged", "tabled", "nonchim")
-rownames(track) <- sample.names
+rownames(track) <- sample.names 
 head(track)
 tail(track)
 
@@ -187,10 +224,15 @@ write.csv(track,file="ReadFilterStats_AllData_final.csv",row.names=TRUE,quote=FA
 #modified version for phyloseq looks like this instead:
 #>Symbiodinium; Clade A; A1.1
 
-taxa <- assignTaxonomy(seqtab.nochim, "GeoSymbio_ITS2_LocalDatabase_verForPhyloseq.fasta", minBoot=5,multithread=TRUE,tryRC=TRUE,outputBootstraps=FALSE)
+taxa <- assignTaxonomy(seqtab.nochim, "/project/bi594/Pine_invasion/sh_general_release_dynamic_s_04.02.2020.fasta", multithread=TRUE)
+taxa.print <- taxa
+rownames(taxa.print) <- NULL #this gets rid of all the sequences
+#head(taxa) #prints full info, including sequence
+head(taxa.print) #this just prints taxonomy; look like fungi? 
 #minboot should be higher
 #Obtain a csv file for the taxonomy so that it's easier to map the sequences for the heatmap.
 write.csv(taxa, file="taxa.csv",row.name=TRUE,quote=FALSE)
+
 unname(head(taxa, 30))
 unname(taxa)
 
@@ -208,13 +250,17 @@ head(taxa)
 ##### handoff 2 phyloseq #######
 ################################
 
+library('phyloseq')
+library('Biostrings')
+library('ggplot2')
+
 #import dataframe holding sample information
 #have your samples in the same order as the seqtab file in the rows, variables as columns
-samdf<-read.csv("variabletable.csv")
+samdf<-read.csv("variabletable_pi.csv", header = TRUE, sep = ',')
 head(samdf)
 head(seqtab.nochim)
 head(taxa)
-rownames(samdf) <- samdf$sample
+rownames(samdf) <- samdf$SAMPLE #making rownames the same as sample names in seq.nochim to merge in phyloseq
 
 # Construct phyloseq object (straightforward from dada2 outputs)
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
@@ -243,4 +289,4 @@ write.csv(psz, file="Phyloseqoutputfinal.csv")
 p <- ggplot(psz, aes(x=Sample, y=Abundance, fill=Class))
 p + geom_bar(stat="identity", colour="black")
 
-
+save.image(file='Environment.post_DADAphyloseq.4.13.21.RData')
