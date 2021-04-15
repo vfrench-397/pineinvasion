@@ -4,11 +4,11 @@ setwd("/project/bi594/Pine_invasion/")
 load('Environment4.13.21.RData')
 
 
-path <- setwd("/project/bi594/Pine_invasion/batch1/")
+setwd("/project/bi594/Pine_invasion/")
 
 
 
-fns <- list.files(path)
+load(file, envir = parent.frame(), verbose = FALSE)fns <- list.files(path)
 fns
 
 #####################################
@@ -27,8 +27,8 @@ library(phyloseq); #packageVersion("phyloseq")
 
 #Set path to unzipped, renamed fastq files
 
-setwd("/project/bi594/Pine_invasion/batch1/")
-path <- "/project/bi594/Pine_invasion/batch1/"
+setwd("/project/bi594/Pine_invasion/rawdata/")
+path <- "/project/bi594/Pine_invasion/rawdata/"
 
 fns <- list.files(path)
 
@@ -119,10 +119,10 @@ tail(out)
 
 setDadaOpt(MAX_CONSIST=30) #set higher to allow more cycles for convergence
 errF <- learnErrors(filtFs, multithread=TRUE)
-#102956500 bases in 411826 reads from 14 samples 
+#101188750 bases in 404755 reads from 9 samples 
 #output is list of 3, does this mean convergence after 3 rounds? 
 errR <- learnErrors(filtRs, multithread=TRUE)
-#112129600 bases in 560648 reads from 16 samples 
+#105691000 bases in 528455 reads from 12 samples 
 #Maximum cycles was set to 30, but Convergence was found after 4 rounds
 #errF may take a long time 
 
@@ -161,9 +161,9 @@ dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
 #will tell how many 'real' variants in unique input seqs
 #By default, the dada function processes each sample independently, but pooled processing is available with pool=TRUE and that may give better results for low sampling depths at the cost of increased computation time. See our discussion about pooling samples for sample inference. 
 dadaFs[[1]] #looking at number of sequence variants found; 
-#90 sequence variants inferred from 1856 input sequences 
+#158 sequence variants inferred from 6180 input sequences 
 dadaRs[[1]]
-#78 sequence variants inferred from 2184 input sequences 
+#149 sequence variants inferred from 6460 input sequences 
 
 #merging paired ends of forward and reverse reads for full sequences 
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=FALSE)
@@ -187,10 +187,10 @@ head(seqtab) #gives sequence, then number of that sequence found in each sample
 
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
-# Identified 63 bimeras out of 4887 input sequences (~1.3%)
+# Identified 16 bimeras out of 1871 input sequences (~1.3%)
 table(nchar(getSequences(seqtab.nochim))) #distribution of sequence lengths 
 
-sum(seqtab.nochim)/sum(seqtab) #.999107 
+sum(seqtab.nochim)/sum(seqtab) #.9993371
 #The fraction of chimeras varies based on factors including experimental procedures and sample complexity, 
 #Most of your reads should remain after chimera removal (it is not uncommon for a majority of sequence variants to be removed though)
 #For our sample, this ratio was 0.9998201, there was only 1 bimera
@@ -245,6 +245,7 @@ seqtab.nochim <- readRDS("final_seqtab_nochim.rds")
 taxa <- readRDS("final_taxa_blastCorrected.rds")
 head(taxa)
 
+
 #everything above this was in dada2, now we're using phyloseq
 ################################
 ##### handoff 2 phyloseq #######
@@ -264,7 +265,7 @@ rownames(samdf) <- samdf$SAMPLE #making rownames the same as sample names in seq
 
 # Construct phyloseq object (straightforward from dada2 outputs)
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
-               sample_data(samdf), 
+               sample_names(samdf), 
                tax_table(taxa))
 ps
 
@@ -273,20 +274,135 @@ ids<-taxa_names(ps)
 ids <- paste0("sq",seq(1, length(colnames(seqtab.nochim))))
 colnames(seqtab.nochim) <- ids
 
-#Bar-plots
-top90 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:90]
-ps.top90 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
-ps.top90 <- prune_taxa(top90, ps.top90)
+#Select the top 90 most abundant taxa
+top30 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:30]
+ps.top30 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+ps.top30 <- prune_taxa(top30, ps.top30)
 
-plot_bar(ps.top90, x="Sample", fill="Class") 
-
-#visusalize via counts rather than abundances:
-plot_bar(ps, x = "sample", fill= "Class") #+ facet_wrap("tank")
-#
 #Obtain a csv file for the phyloseq data. Will give you the abundances for each sample and class. Useful for constructing the heatmap. Also, enables you to use ggplot, and construct more aesthetically pleasing plot.
-psz <- psmelt(ps.top90)
-write.csv(psz, file="Phyloseqoutputfinal.csv")
-p <- ggplot(psz, aes(x=Sample, y=Abundance, fill=Class))
-p + geom_bar(stat="identity", colour="black")
+tax_table <- psmelt(ps)
+write.csv(psz, file="psz.csv")
+read.csv("psz.csv")
+
+#Functional assignments
+##################### 
+#Assign functional groups in Funguild and Fun^fun
+
+devtools::install_github("ropenscilabs/datastorr")
+devtools::install_github("traitecoevo/fungaltraits")
+devtools::install_github("brendanf/FUNGuildR")
+
+library(datastorr)
+library(fungaltraits)
+library(FUNGuildR)
+
+assign_fungal_guilds <- function(tax_table, url = "http://www.stbates.org/funguild_db.php", n.cores = NA){
+  #check if dependencies are installed. If not, stop.----
+  if (!require('fungaltraits',character.only = TRUE)){
+    stop("please install the fungaltraits package from Github (traitecoevo/fungaltraits)")
+  }
+  if (!require('rvest',character.only = TRUE)){
+    stop("please install the rvest package.")
+  }
+  if (!require('jsonlite',character.only = TRUE)){
+    stop("please install the jsonlite package.")
+  }
+  if(!require('doParallel', character.only = TRUE)){
+    stop('please install the doParallel package.')
+  }
+  #check that the input is formatted right. If not, stop, throw an error.
+  if (!is.data.frame(tax_table)){
+    stop('Your taxonomy table needs to be a data.frame. Try again.')
+  }
+  
+  #setup parallel.----
+  library(doParallel)
+  if(is.na(n.cores)){
+    n.cores <- detectCores()
+  }
+  #if number of cores is still NA for some reason set to 1.
+  if(is.na(n.cores)){
+    n.cores <- 1
+    cat('detectCores() returned NA. Setting n.cores to 1.\n')
+  }
+  registerDoParallel(n.cores)
+  
+  
+  
+  ## Format taxonomy table
+  #make sure tax column names are lower case.
+  colnames(tax_table) <- tolower(colnames(tax_table))
+  rows <- rownames(tax_table) # keep rownames for later
+  tax_table <- as.data.frame(apply(tax_table,2,tolower))
+  tax_table$species <- gsub("s__","",tax_table$species)
+  # match tax_table species format to the format of funfun  
+  tax_table$funfun_species <- paste0(tax_table$genus,"_",tax_table$species)
+  
+  # FUNGuild database
+  tax_table_assign <- tax_table
+  tax_table_assign <- cbind.data.frame(lapply(tax_table_assign, tools::toTitleCase))
+  tax_table_assign <- tax_table_assign %>% unite("Taxonomy", 1:7, sep = ";")
+  test_assign <- funguild_assign(otu_table = tax_table_assign)
+  
+  #FUNFUN database
+  # read in funfun database
+  db <- fungaltraits::fungal_traits()
+  funfun <- db
+  #start with highest level of taxonomy and go down.
+  colnames(funfun) <- tolower(colnames(funfun))
+  funfun$genus <- tolower(funfun$genus)
+  funfun$speciesmatched <- stringr::word(tolower(funfun$speciesmatched), 1, 2) 
+  funfun$speciesmatched <- gsub(" ", "_", funfun$speciesmatched)
+  funfun <- funfun[which(!is.na(funfun$guild_fg)),]
+  
+  #setup output list.
+  out <- list() 
+  out <-
+    foreach(i = 1:nrow(tax_table)) %dopar% {
+      to_return <- NA
+      #     to_return <- NA
+      #genus level match.
+      if(tax_table$genus[i] %in% funfun$genus){
+        to_return <- funfun[match(tax_table$genus[i], funfun$genus),c(2,3,52,58,59,61,72,99,101)]
+      }
+      #species level match.
+      if(tax_table$funfun_species[i] %in% funfun$species){
+        to_return <- funfun[match(tax_table$funfun_species[i], funfun$species),c(2,3,52,58,59,61,72,99,101)]
+      }
+      if(tax_table$funfun_species[i] %in% funfun$speciesmatched){
+        to_return <- funfun[match(tax_table$funfun_species[i], funfun$speciesmatched),c(2,3,52,58,59,61,72,99,101)]
+      }
+      #return output.
+      return(data.frame(to_return))
+    } #end parallel loop.
+  
+  #bind up output
+  out.all <- plyr::rbind.fill(out)
+  
+  out.all <- cbind(out.all, test_assign)
+  out.all$guild_assign <- ifelse(is.na(out.all$guild_fg), out.all$guild, out.all$guild_fg)
+  
+  # append output to taxonomy table.
+  tax_table_out <- cbind.data.frame(tax_table, guild= out.all$guild_assign)
+  
+  #report and return output.
+  cat(sum(!is.na(tax_table_out$guild))/(nrow(tax_table_out))*100,'% of taxa assigned a functional guild.\n', sep = '')
+  return(tax_table_out)
+}
+
+library(jsonlite)
+assign_fungal_guilds(psz)
+
+############################
+
+
+#Append the metadata to the phyloseq data
+colnames(psz)[2] <- "SampleID" #rename the sample ID column so we can merge the two dataframes by this column
+fulldf <- merge(psz, samdf, by="SampleID")
+
+p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Genus))
+p + geom_bar(stat="identity", colour="black") +
+  scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
+
 
 save.image(file='Environment.post_DADAphyloseq.4.13.21.RData')
