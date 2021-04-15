@@ -3,10 +3,18 @@
 #navigate into the correct directory
 setwd("/project/bi594/Pine_invasion/")
 library(DESeq2)
-countData <- read.table("pineinvasion_seqtab.csv")
-head(countData)
+
+#Merge count table with Genus IDs
+taxa<-read.csv("taxa.csv")
+colnames(taxa)[1] = "sequence"
+
+countData<- read.csv("pineinvasion_nochim.csv", row.names = 1)
+countData<-t(countData)
+cbind(countData, taxa$Genus)
+
+
+
 length(countData[,1])
-#19717
 names(countData)=c( "pH7.5a", "pH7.5b", "pH7.5c", "pH7.6a", "pH7.6b", "pH7.6c", "pH8a", "pH8b",  "pH8c")
 row.names(countData)=sub("", "isogroup", rownames(countData))
 head(countData)

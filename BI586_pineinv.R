@@ -262,6 +262,7 @@ head(samdf)
 head(seqtab.nochim)
 head(taxa)
 rownames(samdf) <- samdf$SAMPLE #making rownames the same as sample names in seq.nochim to merge in phyloseq
+head(samdf)
 
 # Construct phyloseq object (straightforward from dada2 outputs)
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
@@ -269,9 +270,17 @@ ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE),
                tax_table(taxa))
 ps
 
+#collapse to genus
+glom <- tax_glom(ps, taxrank = 'Genus')
+otu<- data.frame(otu_table(glom))
+tax_table <- data.frame(tax_table(glom))
+Genus<- tax_table$Genus
+colnames(otu) <- Genus
+
+
 #replace sequences with shorter names (correspondence table output below)
 ids<-taxa_names(ps)
-ids <- paste0("sq",seq(1, length(colnames(seqtab.nochim))))
+ids <- paste0("sq",seq(1, length(colnames(seqtab.nochim)))) #assign a vector of Genus names
 colnames(seqtab.nochim) <- ids
 
 #Select the top 90 most abundant taxa
