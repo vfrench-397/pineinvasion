@@ -6,8 +6,6 @@ load('Environment4.13.21.RData')
 
 setwd("/project/bi594/Pine_invasion/")
 
-
-
 load(file, envir = parent.frame(), verbose = FALSE)fns <- list.files(path)
 fns
 
@@ -198,6 +196,7 @@ sum(seqtab.nochim)/sum(seqtab) #.9993371
 setwd('/project/bi594/Pine_invasion/')
 write.csv(seqtab,file="pineinvasion_seqtab.csv")
 write.csv(seqtab.nochim,file="pineinvasion_nochim.csv")
+
 ################################
 ##### Track Read Stats #######
 ################################
@@ -224,6 +223,8 @@ write.csv(track,file="ReadFilterStats_AllData_final.csv",row.names=TRUE,quote=FA
 #modified version for phyloseq looks like this instead:
 #>Symbiodinium; Clade A; A1.1
 
+setwd('/project/bi594/Pine_invasion/')
+
 taxa <- assignTaxonomy(seqtab.nochim, "/project/bi594/Pine_invasion/sh_general_release_dynamic_s_04.02.2020.fasta", multithread=TRUE)
 taxa.print <- taxa
 rownames(taxa.print) <- NULL #this gets rid of all the sequences
@@ -231,10 +232,12 @@ rownames(taxa.print) <- NULL #this gets rid of all the sequences
 head(taxa.print) #this just prints taxonomy; look like fungi? 
 #minboot should be higher
 #Obtain a csv file for the taxonomy so that it's easier to map the sequences for the heatmap.
-write.csv(taxa, file="taxa.csv",row.name=TRUE,quote=FALSE)
 
 unname(head(taxa, 30))
 unname(taxa)
+
+taxa<- sub('...', '', taxa)
+write.csv(taxa, file="taxa.csv",row.name=TRUE,quote=FALSE)
 
 #Now, save outputs so can come back to the analysis stage at a later point if desired
 saveRDS(seqtab.nochim, file="final_seqtab_nochim.rds")
@@ -243,13 +246,15 @@ saveRDS(taxa, file="final_taxa_blastCorrected.rds")
 #If you need to read in previously saved datafiles
 seqtab.nochim <- readRDS("final_seqtab_nochim.rds")
 taxa <- readRDS("final_taxa_blastCorrected.rds")
-head(taxa)
+
 
 
 #everything above this was in dada2, now we're using phyloseq
 ################################
 ##### handoff 2 phyloseq #######
 ################################
+
+setwd('/project/bi594/Pine_invasion/')
 
 library('phyloseq')
 library('Biostrings')
@@ -258,40 +263,42 @@ library('ggplot2')
 #import dataframe holding sample information
 #have your samples in the same order as the seqtab file in the rows, variables as columns
 samdf<-read.csv("variabletable_pi.csv", header = TRUE, sep = ',')
-head(samdf)
-head(seqtab.nochim)
-head(taxa)
 rownames(samdf) <- samdf$SAMPLE #making rownames the same as sample names in seq.nochim to merge in phyloseq
-head(samdf)
 
-# Construct phyloseq object (straightforward from dada2 outputs)
+
+#Construct phyloseq object (straightforward from dada2 outputs)
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
                sample_names(samdf), 
                tax_table(taxa))
 ps
 
-#collapse to genus
+#Collapse the data in the phyloseq object to genus-level IDs
 glom <- tax_glom(ps, taxrank = 'Genus')
+#Create a dataframe of the OTUs and taxonomic assignments at the genus level
 otu<- data.frame(otu_table(glom))
 tax_table <- data.frame(tax_table(glom))
+#Replace the sequences in the OTU table with corresponding Genus-level IDs
 Genus<- tax_table$Genus
 colnames(otu) <- Genus
+#the new OTU df will be the input for WGCNA
 
 
 #replace sequences with shorter names (correspondence table output below)
-ids<-taxa_names(ps)
-ids <- paste0("sq",seq(1, length(colnames(seqtab.nochim)))) #assign a vector of Genus names
-colnames(seqtab.nochim) <- ids
+#ids<-taxa_names(ps)
+#ids <- paste0("sq",seq(1, length(colnames(seqtab.nochim))))
+#colnames(seqtab.nochim) <- ids
 
 #Select the top 90 most abundant taxa
-top30 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:30]
-ps.top30 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
-ps.top30 <- prune_taxa(top30, ps.top30)
+top90 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:90]
+ps.top90 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+ps.top90 <- prune_taxa(top90, ps.top90)
 
 #Obtain a csv file for the phyloseq data. Will give you the abundances for each sample and class. Useful for constructing the heatmap. Also, enables you to use ggplot, and construct more aesthetically pleasing plot.
-tax_table <- psmelt(ps)
+psz <- psmelt(ps)
 write.csv(psz, file="psz.csv")
-read.csv("psz.csv")
+psz90 <- psmelt(ps.top90)
+write.csv(psz90, file="top90.csv")
+
 
 #Functional assignments
 ##################### 
@@ -305,99 +312,6 @@ library(datastorr)
 library(fungaltraits)
 library(FUNGuildR)
 
-assign_fungal_guilds <- function(tax_table, url = "http://www.stbates.org/funguild_db.php", n.cores = NA){
-  #check if dependencies are installed. If not, stop.----
-  if (!require('fungaltraits',character.only = TRUE)){
-    stop("please install the fungaltraits package from Github (traitecoevo/fungaltraits)")
-  }
-  if (!require('rvest',character.only = TRUE)){
-    stop("please install the rvest package.")
-  }
-  if (!require('jsonlite',character.only = TRUE)){
-    stop("please install the jsonlite package.")
-  }
-  if(!require('doParallel', character.only = TRUE)){
-    stop('please install the doParallel package.')
-  }
-  #check that the input is formatted right. If not, stop, throw an error.
-  if (!is.data.frame(tax_table)){
-    stop('Your taxonomy table needs to be a data.frame. Try again.')
-  }
-  
-  #setup parallel.----
-  library(doParallel)
-  if(is.na(n.cores)){
-    n.cores <- detectCores()
-  }
-  #if number of cores is still NA for some reason set to 1.
-  if(is.na(n.cores)){
-    n.cores <- 1
-    cat('detectCores() returned NA. Setting n.cores to 1.\n')
-  }
-  registerDoParallel(n.cores)
-  
-  
-  
-  ## Format taxonomy table
-  #make sure tax column names are lower case.
-  colnames(tax_table) <- tolower(colnames(tax_table))
-  rows <- rownames(tax_table) # keep rownames for later
-  tax_table <- as.data.frame(apply(tax_table,2,tolower))
-  tax_table$species <- gsub("s__","",tax_table$species)
-  # match tax_table species format to the format of funfun  
-  tax_table$funfun_species <- paste0(tax_table$genus,"_",tax_table$species)
-  
-  # FUNGuild database
-  tax_table_assign <- tax_table
-  tax_table_assign <- cbind.data.frame(lapply(tax_table_assign, tools::toTitleCase))
-  tax_table_assign <- tax_table_assign %>% unite("Taxonomy", 1:7, sep = ";")
-  test_assign <- funguild_assign(otu_table = tax_table_assign)
-  
-  #FUNFUN database
-  # read in funfun database
-  db <- fungaltraits::fungal_traits()
-  funfun <- db
-  #start with highest level of taxonomy and go down.
-  colnames(funfun) <- tolower(colnames(funfun))
-  funfun$genus <- tolower(funfun$genus)
-  funfun$speciesmatched <- stringr::word(tolower(funfun$speciesmatched), 1, 2) 
-  funfun$speciesmatched <- gsub(" ", "_", funfun$speciesmatched)
-  funfun <- funfun[which(!is.na(funfun$guild_fg)),]
-  
-  #setup output list.
-  out <- list() 
-  out <-
-    foreach(i = 1:nrow(tax_table)) %dopar% {
-      to_return <- NA
-      #     to_return <- NA
-      #genus level match.
-      if(tax_table$genus[i] %in% funfun$genus){
-        to_return <- funfun[match(tax_table$genus[i], funfun$genus),c(2,3,52,58,59,61,72,99,101)]
-      }
-      #species level match.
-      if(tax_table$funfun_species[i] %in% funfun$species){
-        to_return <- funfun[match(tax_table$funfun_species[i], funfun$species),c(2,3,52,58,59,61,72,99,101)]
-      }
-      if(tax_table$funfun_species[i] %in% funfun$speciesmatched){
-        to_return <- funfun[match(tax_table$funfun_species[i], funfun$speciesmatched),c(2,3,52,58,59,61,72,99,101)]
-      }
-      #return output.
-      return(data.frame(to_return))
-    } #end parallel loop.
-  
-  #bind up output
-  out.all <- plyr::rbind.fill(out)
-  
-  out.all <- cbind(out.all, test_assign)
-  out.all$guild_assign <- ifelse(is.na(out.all$guild_fg), out.all$guild, out.all$guild_fg)
-  
-  # append output to taxonomy table.
-  tax_table_out <- cbind.data.frame(tax_table, guild= out.all$guild_assign)
-  
-  #report and return output.
-  cat(sum(!is.na(tax_table_out$guild))/(nrow(tax_table_out))*100,'% of taxa assigned a functional guild.\n', sep = '')
-  return(tax_table_out)
-}
 
 library(jsonlite)
 assign_fungal_guilds(psz)
@@ -408,10 +322,16 @@ assign_fungal_guilds(psz)
 #Append the metadata to the phyloseq data
 colnames(psz)[2] <- "SampleID" #rename the sample ID column so we can merge the two dataframes by this column
 fulldf <- merge(psz, samdf, by="SampleID")
+#do the same for the top 90 taxa
+colnames(psz90)[2] <- "SampleID" #rename the sample ID column so we can merge the two dataframes by this column
+fulldf90 <- merge(psz90, samdf, by="SampleID")
 
-p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Genus))
+#Barplot of fungal abundance by forest type separated by Class
+p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Class))+ 
+  labs(x="Forest type", fill = "Class")
 p + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 
+ggsave("Abundance.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 
-save.image(file='Environment.post_DADAphyloseq.4.13.21.RData')
+save.image(file='Environment.4.15.21.RData')
