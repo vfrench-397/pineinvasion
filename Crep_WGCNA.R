@@ -1,9 +1,9 @@
 ########################################################################################################
 #Get all genes into WGCNA but remove the genes with low basemean values
 #navigate into the correct directory
-setwd("/Users/Victoria1/Desktop/Grad.School/EcoGen. /WGCNA")
+setwd("/project/bi594/Pine_invasion/")
 library(DESeq2)
-countData <- read.table("Crep_counts.txt")
+countData <- read.table("pineinvasion_seqtab.csv")
 head(countData)
 length(countData[,1])
 #19717
