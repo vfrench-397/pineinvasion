@@ -8,22 +8,12 @@ library(DESeq2)
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
 
-t <- t(countData)
-rownames(t)[1] = "Sample_ID"
-colnames(t) <- countData$Sample_ID
-t<-t[-1,]
-head(t)
+t=read.csv(file="otu.csv", row.names = 1)
+t2<- as.data.frame(lapply(t,as.numeric))
+str(t2)
 
-#the below code is everything we were trying to get our matrix to be numeric instead of characters
-t <- as.numeric(t)
-t <- as.integer(t)
-t<- data.matrix(t)
-
-
-class(t)
-str(t)
-
-head(t)
+t2=t(as.matrix(as.data.frame(lapply(t,as.numeric))))
+colnames(t2)=row.names(t)
 
 
 
@@ -41,7 +31,7 @@ class(colData)
 str(colData)
 
 
-dds<-DESeqDataSetFromMatrix(countData=t, colData=colData, design=~ treat) 
+dds<-DESeqDataSetFromMatrix(countData=t2, colData=colData, design=~ treat) 
 dds<-DESeq(dds)
 
 res<- results(dds)

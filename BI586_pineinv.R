@@ -351,4 +351,4 @@ p2 + geom_bar(stat="identity", colour="black") +
 
 
 
-save.image(file='Environment.4.18.21.RData')
+save.image(file='Environment.4.19.21.RData')
