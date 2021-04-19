@@ -281,6 +281,7 @@ tax_table <- data.frame(tax_table(glom))
 Genus<- tax_table$Genus
 colnames(otu) <- Genus
 #the new OTU df will be the input for WGCNA
+write.csv(otu,file="otu.csv")
 
 
 #replace sequences with shorter names (correspondence table output below)

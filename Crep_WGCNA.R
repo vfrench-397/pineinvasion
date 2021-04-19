@@ -5,26 +5,47 @@ setwd("/project/bi594/Pine_invasion/")
 library(DESeq2)
 
 #Merge count table with Genus IDs
-taxa<-read.csv("taxa.csv")
-colnames(taxa)[1] = "sequence"
+countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
+colnames(countData)[1] = "Sample_ID"
 
-countData<- read.csv("pineinvasion_nochim.csv", row.names = 1)
-countData<-t(countData)
-cbind(countData, taxa$Genus)
+t <- t(countData)
+rownames(t)[1] = "Sample_ID"
+colnames(t) <- countData$Sample_ID
+t<-t[-1,]
+
+dims <- dim(t)
+t <- as.numeric(t)
+dim(t) <- dims   
+
+is.integer(t)
+t <- as.integer(as.matrix(t))
+is.integer(t)
+
+t<- as.numeric(as.character(t))
+t<- data.matrix(t)
+is.numeric(t)
+
+class(t)
+str(t)
+
+head(t)
+
+#countDataMatrix <- as.matrix(t[-1,])
 
 
+length(countDataMatrix[,1])
+head(countDataMatrix)
 
-length(countData[,1])
-names(countData)=c( "pH7.5a", "pH7.5b", "pH7.5c", "pH7.6a", "pH7.6b", "pH7.6c", "pH8a", "pH8b",  "pH8c")
-row.names(countData)=sub("", "isogroup", rownames(countData))
-head(countData)
-
-treat=c( "pH7.5", "pH7.5", "pH7.5", "pH7.6", "pH7.6", "pH7.6", "pH8", "pH8",  "pH8")
+treat=samdf$site_code
 g=data.frame(treat)
 g
-colData<- g
+colData<- g #create coldata for DESeq 
 
-dds<-DESeqDataSetFromMatrix(countData=countData, colData=colData, design=~ treat) 
+class(colData)
+str(colData)
+
+
+dds<-DESeqDataSetFromMatrix(countData=t, colData=colData, design=~ treat) 
 dds<-DESeq(dds)
 
 res<- results(dds)
