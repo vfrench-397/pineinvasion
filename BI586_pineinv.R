@@ -299,10 +299,17 @@ write.csv(psz, file="psz.csv")
 psz90 <- psmelt(ps.top90)
 write.csv(psz90, file="top90.csv")
 
-
 #Functional assignments
 ##################### 
 #Assign functional groups in Funguild and Fun^fun
+
+#Format the input table so it can be run in Funguild
+library(data.table)
+
+funguild_input<- data.frame(taxa)
+funguild_input$OTU <- row.names(funguild_input)  
+funguild_input$Taxonomy <- paste(funguild_input$Kingdom, funguild_input$Phylum, funguild_input$Class, funguild_input$Order, funguild_input$Family, funguild_input$Genus, funguild_input$Species, sep =';')
+funguild_input<- subset(funguild_input, select=-c(Kingdom, Phylum, Class, Order, Family, Genus, Species))
 
 devtools::install_github("ropenscilabs/datastorr")
 devtools::install_github("traitecoevo/fungaltraits")
@@ -311,10 +318,9 @@ devtools::install_github("brendanf/FUNGuildR")
 library(datastorr)
 library(fungaltraits)
 library(FUNGuildR)
-
-
 library(jsonlite)
-assign_fungal_guilds(psz)
+
+guilds<- funguild_assign(funguild_input)
 
 ############################
 
@@ -334,4 +340,4 @@ p + geom_bar(stat="identity", colour="black") +
 
 ggsave("Abundance.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 
-save.image(file='Environment.4.15.21.RData')
+save.image(file='Environment.4.18.21.RData')
