@@ -341,4 +341,14 @@ p + geom_bar(stat="identity", colour="black") +
 
 ggsave("Abundance.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 
+#Add guild annotations onto the abundance data
+fullguild<- merge(fulldf, guilds, by="OTU")
+
+p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+ 
+  labs(x="Forest type", fill = "Class")
+p2 + geom_bar(stat="identity", colour="black") +
+  scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
+
+
+
 save.image(file='Environment.4.18.21.RData')
