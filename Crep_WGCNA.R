@@ -12,30 +12,26 @@ t <- t(countData)
 rownames(t)[1] = "Sample_ID"
 colnames(t) <- countData$Sample_ID
 t<-t[-1,]
+head(t)
 
-dims <- dim(t)
+#the below code is everything we were trying to get our matrix to be numeric instead of characters
 t <- as.numeric(t)
-dim(t) <- dims   
-
-is.integer(t)
-t <- as.integer(as.matrix(t))
-is.integer(t)
-
-t<- as.numeric(as.character(t))
+t <- as.integer(t)
 t<- data.matrix(t)
-is.numeric(t)
+
 
 class(t)
 str(t)
 
 head(t)
 
-#countDataMatrix <- as.matrix(t[-1,])
 
 
 length(countDataMatrix[,1])
 head(countDataMatrix)
 
+#Read in treatment data
+samdf<- read.csv("variabletable_pi.csv")
 treat=samdf$site_code
 g=data.frame(treat)
 g
