@@ -3,10 +3,17 @@
 #navigate into the correct directory
 setwd("/project/bi594/Pine_invasion/")
 library(DESeq2)
+library(BiocManager)
+install.packages('MCMC.OTU')
+library(MCMC.OTU)
+
+load('Environment.4.19.21.RData')
 
 #Merge count table with Genus IDs
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
+
+seq.trim <- purgeOutliers(countData,count.columns=29:282,sampleZcut=-2.5,otu.cut=.035)
 
 t=read.csv(file="otu.csv", row.names = 1)
 t2<- as.data.frame(lapply(t,as.numeric))
@@ -32,25 +39,37 @@ str(colData)
 
 
 dds<-DESeqDataSetFromMatrix(countData=t2, colData=colData, design=~ treat) 
-dds<-DESeq(dds)
 
-res<- results(dds)
-#filter for contigs with average(baseMean) >3
-res3<-res[res$baseMean>3, ]
-dim(res) #19717
-dim(res3) #12585
+#diagdds = phyloseq_to_deseq2(ps.rarefied, ~ site + position)
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans = apply(counts(dds), 1, gm_mean)
+dds = estimateSizeFactors(dds, geoMeans = geoMeans)
+dds = DESeq(dds, fitType="local")
+
+#dds<-DESeq(dds)
+
+
+#res<- results(dds)
+#filter for contigs with average(baseMean) >3 ****
+#res3<-res[res$baseMean>3, ]
+#dim(res) #281
+#dim(res3) #56
+#Didn't filter any counts 
+#Not filtering by base mean because basemean filter formatted for gene counts, not OTU abundance data. Filtering previously with purgeOutliers function. 
 
 # get rlog data (better transformation when size factors vary across samples)
-rld <- rlogTransformation(dds, blind=FALSE, fitType="local")
+rld <- rlogTransformation(dds, blind=FALSE, fitType="local") #This function transforms the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size.
 head(rld)
-rld_wg=(assay(rld))
+rld_wg=(assay(rld)) #Making matrix of rlogTransformation data 
 head(rld_wg)
 nrow(rld_wg)
 #19717
-rldFiltered=(assay(rld))[(rownames((assay(rld))) %in% rownames(res3)),]
+rldFiltered=(assay(rld))[(rownames((assay(rld))) %in% rownames(dds)),]
 nrow(rldFiltered)
 #12585
-write.csv( rldFiltered,file="Crep_wgcna_allgenes.csv",quote=F,row.names=T)
+write.csv(rldFiltered,file="Invasion_wgcna_allgenes.csv",quote=F,row.names=T)
 #now we have our filtered data to take into WGCNA
 
 #source("http://bioconductor.org/biocLite.R") #To download DESeq package (you can comment these lines out, they only need to be run once ever)
@@ -68,7 +87,7 @@ library(flashClust)
 options(stringsAsFactors=FALSE)
 allowWGCNAThreads()
 
-dat=read.csv("Crep_wgcna_allgenes.csv")
+dat=read.csv("Invasion_wgcna_allgenes.csv")
 head(dat) 
 rownames(dat)<-dat$X
 head(dat)
@@ -76,11 +95,12 @@ dat$X=NULL
 head(dat)
 names(dat)
 nrow(dat)
-#12585
+#281
 datExpr0 = as.data.frame(t(dat))
 
-gsg = goodSamplesGenes(datExpr0, verbose = 3);
-gsg$allOK #if TRUE, no outlier genes, if false run the script below
+#Don't run, no need for extra filtering? 
+gsg = goodSamplesGenes(datExpr0, verbose = 1); #verbose=1 default, change if we want more verbose data ? 
+gsg$allOK #if TRUE, no outlier taxa, if false run the script below
 
 if (!gsg$allOK)
 {if (sum(!gsg$goodGenes)>0)
@@ -89,13 +109,13 @@ if (!gsg$allOK)
     printFlush(paste("Removing samples:", paste(rownames(datExpr0)[!gsg$goodSamples], collapse=", ")))
   datExpr0= datExpr0[gsg$goodSamples, gsg$goodGenes]
 }
-gsg=goodSamplesGenes(datExpr0, verbose = 3)
+gsg=goodSamplesGenes(datExpr0, verbose = 1)
 gsg$allOK 
 dim(datExpr0) 
-#12585  No change because there were neevr any outliers
+#264  #17 taxa excluded #probably don't filter 
 
 ### Outlier detection incorporated into trait measures. 
-traitData= read.csv("crep_wgcna_traits.csv", row.names=1)
+traitData= read.csv("Invasion_traits_WGCNA.csv", row.names=1)
 dim(traitData)
 head(traitData)
 names(traitData)
@@ -103,8 +123,6 @@ names(traitData)
 # Form a data frame analogous to expression data that will hold the clinical traits.
 dim(datExpr0)
 rownames(datExpr0)
-rownames(traitData)=rownames(datExpr0)
-traitData$Sample= NULL 
 # datTraits=allTraits
 datTraits=traitData
 
@@ -113,27 +131,29 @@ head(datTraits)
 head(datExpr0)
 
 #sample dendrogram and trait heat map showing outliers
-A=adjacency(t(datExpr0),type="signed")
+A=adjacency(t(datExpr0)) #type back to default, no direction in ITS counts
+#Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
 # this calculates the whole network connectivity we choose signed because we care about direction of gene expression
-k=as.numeric(apply(A,2,sum))-1
+k=as.numeric(apply(A,2,sum))-1 #Summing columns of adjacency matrix (-1 to account for self correlation) 
 # standardized connectivity
 Z.k=scale(k)
 thresholdZ.k=-2.5 # often -2.5
 outlierColor=ifelse(Z.k<thresholdZ.k,"red","black")
-sampleTree = flashClust(as.dist(1-A), method = "average")
+sampleTree = flashClust(as.dist(1-A), method = "average") #**** average 
 # Convert traits to a color representation where red indicates high values
 traitColors=data.frame(numbers2colors(datTraits,signed=FALSE))
 dimnames(traitColors)[[2]]=paste(names(datTraits))
 datColors=data.frame(outlierC=outlierColor,traitColors)
 # Plot the sample dendrogram and the colors underneath.
 plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,main="Sample dendrogram and trait heatmap")
+#no outliers 
 
 # Remove outlying samples from expression and trait data
 # remove.samples= Z.k<thresholdZ.k | is.na(Z.k)
 # datExpr=datExpr0[!remove.samples,]
 # datTraits=datTraits[!remove.samples,]
 
-save(datExpr0, datTraits, file="Crep_Samples_Traits_ALL.RData")
+save(datExpr0, datTraits, file="Invasion_Samples_Traits_ALL.RData")
 
 ################Moving on!  Network construction and module detection - this section can take a lot of time you might consider running it on a cluster for a larger dataset
 library(WGCNA)
@@ -141,7 +161,7 @@ library(flashClust)
 options(stringsAsFactors = FALSE)
 #enableWGCNAThreads use this in base R
 allowWGCNAThreads() 
-lnames = load(file="Crep_Samples_Traits_ALL.RData")
+lnames = load(file="Invasion_Samples_Traits_ALL.RData")
 
 #Figure out proper SFT
 # Choose a set of soft-thresholding powers
