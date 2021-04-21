@@ -1,7 +1,12 @@
 #Pine invasion project
 #Loading in env. 
-setwd("/project/bi594/Pine_invasion/")
-load('Environment4.13.21.RData')
+
+#Create log of output
+my_log <- file("DADA2_output.txt") # File name of output log
+sink(my_log, append = TRUE, type = "output") # Writing console output to log file
+sink(my_log, append = TRUE, type = "message")
+cat(readChar(rstudioapi::getSourceEditorContext()$path, # Writing currently opened R script to file
+             file.info(rstudioapi::getSourceEditorContext()$path)$size))
 
 
 setwd("/project/bi594/Pine_invasion/")
@@ -73,14 +78,15 @@ filtRs <- file.path(path, "Filtered", paste0(sample.names, "_R_filt.fastq.gz"))
 names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 
-#Find out if we need to remove primer
-primerF<-grep("TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG", "RV238_S210_L001_R1_001.fastq.gz")
+#Find out if we need to remove primers
+primerF<-grep("CTTGGTCATTTAGAGGAAGTAA", "RV238_S210_L001_R1_001.fastq.gz") #ITS1F forward primer
 primerF
-#integer(0) - primer was not found, has already been filtered! Also confirmed in the SCC terminal 
-primerR<-grep("TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG", "RV238_S210_L001_R2_001.fastq.gz")
+#integer(0) - primer was not found, has already been filtered! Also confirmed in the SCC terminal with grep function
+primerR<-grep("GCTGCGTTCTTCATCGATGC", "RV238_S210_L001_R2_001.fastq.gz") #ITS4 reverse primer
 primerR
+#integer(0) - primer was not found, has already been filtered! Also confirmed in the SCC terminal with grep function
 
-# Filter forward reads
+# Filter forward and reverse reads
 out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen= c(250,200), #end of single end reads = approx. 250 bp
                      maxN=0, #DADA does not allow Ns - filter out Ns (degenerate base)
                      maxEE= c(2,2), #allow 1 expected errors, where EE = sum(10^(-Q/10)); more conservative, model converges
@@ -171,7 +177,7 @@ head(mergers[[1]])
 
 
 #construct sequence table
-seqtab <- makeSequenceTable(mergers) #INPUT for WGCNA? 
+seqtab <- makeSequenceTable(mergers)
 dim(seqtab) #4887 sequence variants? 
 head(seqtab) #gives sequence, then number of that sequence found in each sample
 
@@ -351,4 +357,9 @@ p2 + geom_bar(stat="identity", colour="black") +
 
 
 
-save.image(file='Environment.4.19.21.RData')
+save.image(file='Environment.4.20.21.RData')
+
+
+closeAllConnections() # Close connection to log file
+
+
