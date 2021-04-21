@@ -2,11 +2,11 @@
 #Loading in env. 
 
 #Create log of output
-my_log <- file("DADA2_output.txt") # File name of output log
-sink(my_log, append = TRUE, type = "output") # Writing console output to log file
-sink(my_log, append = TRUE, type = "message")
-cat(readChar(rstudioapi::getSourceEditorContext()$path, # Writing currently opened R script to file
-             file.info(rstudioapi::getSourceEditorContext()$path)$size))
+#my_log <- file("DADA2_output.txt") # File name of output log
+#sink(my_log, append = TRUE, type = "output") # Writing console output to log file
+#sink(my_log, append = TRUE, type = "message")
+#cat(readChar(rstudioapi::getSourceEditorContext()$path, # Writing currently opened R script to file
+#             file.info(rstudioapi::getSourceEditorContext()$path)$size))
 
 
 setwd("/project/bi594/Pine_invasion/")
@@ -178,7 +178,7 @@ head(mergers[[1]])
 
 #construct sequence table
 seqtab <- makeSequenceTable(mergers)
-dim(seqtab) #4887 sequence variants? 
+dim(seqtab) #1871 sequence variants? 
 head(seqtab) #gives sequence, then number of that sequence found in each sample
 
 ################################
@@ -360,6 +360,6 @@ p2 + geom_bar(stat="identity", colour="black") +
 save.image(file='Environment.4.20.21.RData')
 
 
-closeAllConnections() # Close connection to log file
+#closeAllConnections() # Close connection to log file
 
 
