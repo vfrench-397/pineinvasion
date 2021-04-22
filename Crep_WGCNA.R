@@ -2,11 +2,13 @@
 #Get all genes into WGCNA but remove the genes with low basemean values
 #navigate into the correct directory
 setwd("/project/bi594/Pine_invasion/")
+library(WGCNA)
+library(flashClust)
 library(DESeq2)
 library(BiocManager)
 library(MCMC.OTU)
 
-load('Environment.4.19.21.RData')
+load('Environment.4.20.21.RData')
 
 #Merge count table with Genus IDs
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
@@ -23,6 +25,7 @@ colnames(t) <- rownames(count.trim)
 class(t) #t transposes data.frame into a matrix 
 ncol(t)
 nrow(t)
+
 
 #Read in treatment data
 samdf<- read.csv("variabletable_pi.csv")
@@ -138,13 +141,13 @@ head(datExpr0)
 #sample dendrogram and trait heat map showing outliers
 A=adjacency(t(datExpr0)) #type back to default, no direction in ITS counts
 #Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
-# this calculates the whole network connectivity we choose signed because we care about direction of gene expression
+# this calculates the whole network connectivity we choose unsigned because we are dealing with OTU counts, not gene expression
 k=as.numeric(apply(A,2,sum))-1 #Summing columns of adjacency matrix (-1 to account for self correlation) 
 # standardized connectivity
 Z.k=scale(k)
 thresholdZ.k=-2.5 # often -2.5
 outlierColor=ifelse(Z.k<thresholdZ.k,"red","black")
-sampleTree = flashClust(as.dist(1-A), method = "average") #**** average 
+sampleTree = flashClust(as.dist(1-A), method = "average") #**** why did you change from default ("complete")?
 # Convert traits to a color representation where red indicates high values
 traitColors=data.frame(numbers2colors(datTraits,signed=FALSE))
 dimnames(traitColors)[[2]]=paste(names(datTraits))
@@ -169,6 +172,7 @@ allowWGCNAThreads()
 lnames = load(file="Invasion_Samples_Traits_ALL.RData")
 
 #Figure out proper SFT
+
 # Choose a set of (candidate) soft-thresholding powers
 powers = c(seq(1, 90, by = 10), seq(100, 200, by = 10)); #default; Producing SFT.R.sq wayyyyy too small 
 #may need to adjust these power values to hone in on proper sft value
@@ -213,20 +217,25 @@ text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
 
 softPower=8 #smallest value to plateau at ~0.85
 adjacency=adjacency(datExpr0, power=softPower,type="unsigned") #must change method type here too!!
+#Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
+
 #translate the adjacency into topological overlap matrix and calculate the corresponding dissimilarity:
 TOM= TOMsimilarity(adjacency,TOMType = "unsigned")
 dissTOM= 1-TOM
 
 library(flashClust)
-geneTree= flashClust(as.dist(dissTOM), method="average")
+geneTree= flashClust(as.dist(dissTOM), method="average") #do we want to change method back to default?
 sizeGrWindow(10,6)
 # pdf(file="dendrogram_thresh16.5_signed_1868.pdf", width=20, height=20)
 plot(geneTree, xlab="", sub="", main= "Gene Clustering on TOM-based dissimilarity", labels= FALSE,hang=0.04)
 # dev.off()
 #each leaf corresponds to a gene, branches grouping together densely are interconnected, highly co-expressed genes
 
+
 minModuleSize=2 #we only want large modules #set to 90 originally (How many taxa do we want? Arbitrary?)
 dynamicMods= cutreeDynamic(dendro= geneTree, distM= dissTOM, deepSplit=2, pamRespectsDendro= FALSE, minClusterSize= minModuleSize)
+#DeepSplit: For method "hybrid", can be either logical or integer in the range 0 to 4. For method "tree", must be logical. In both cases, provides a rough control over sensitivity to cluster splitting. The higher the value (or if TRUE), the more and smaller clusters will be produced.
+
 table(dynamicMods)
 #5 modules 35 out of 56 taxa not in a module 
 
@@ -235,7 +244,7 @@ dynamicColors= labels2colors(dynamicMods)
 sizeGrWindow(8,6)
 plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang= 0.05, main= "Gene dendrogram and module colors")
 
-#Merg modules whose expression profiles are very similar
+#Merge modules whose expression profiles are very similar
 #calculate eigengenes
 MEList= moduleEigengenes(datExpr0, colors= dynamicColors,softPower = 13)
 MEs= MEList$eigengenes
@@ -471,3 +480,5 @@ names(modkME)=modColName
 write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
 
 ######--------------------end--------------------#######
+
+save.image(file='Environment.4.21.21.RData')
