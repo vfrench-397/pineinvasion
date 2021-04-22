@@ -14,6 +14,7 @@ load('Environment.4.20.21.RData')
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
 
+count.trim <- purgeOutliers(countData,count.columns=2:282, otu.cut= .000000000001)
 count.trim <- purgeOutliers(countData,count.columns=2:282)
 #Trimmed RV55 sample and a little under 230 taxa; adjust the arguments here; losing too many? too few? 
 rownames(count.trim)=count.trim$cdat
@@ -23,6 +24,7 @@ class(count.trim)
 t<- t(as.data.frame(lapply(count.trim,as.numeric)))
 colnames(t) <- rownames(count.trim)
 class(t) #t transposes data.frame into a matrix 
+sapply(t, is.numeric)
 ncol(t)
 nrow(t)
 
@@ -40,13 +42,9 @@ class(colData)
 str(colData)
 nrow(colData)
 
-<<<<<<< HEAD
-#**running deseq to filter super low counts**
-dds<-DESeqDataSetFromMatrix(countData=t2, colData=colData, design=~ treat) 
-=======
 
+#**running deseq to filter super low counts**
 dds<-DESeqDataSetFromMatrix(countData=t, colData=colData, design=~ treat) 
->>>>>>> 781be6b9949c6a6fbcca889627509c8dde888991
 
 #diagdds = phyloseq_to_deseq2(ps.rarefied, ~ site + position)
 gm_mean = function(x, na.rm=TRUE){
@@ -68,7 +66,7 @@ dds = DESeq(dds, fitType="local")
 #Not filtering by base mean because basemean filter formatted for gene counts, not OTU abundance data. Filtering previously with purgeOutliers function. 
 
 # get rlog data (better transformation when size factors vary across samples)
-rld <- rlogTransformation(dds, blind=FALSE, fitType="local")
+rld <- rlogTransformation(dds, blind=TRUE, fitType="local")
 #**should be blind=TRUE ? the benefit of wgcna is that it has no idea what our model was so normalize with this function**
 #This function transforms the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size.
 head(rld)
@@ -78,13 +76,9 @@ nrow(rld_wg)
 #56
 rldFiltered=(assay(rld))[(rownames((assay(rld))) %in% rownames(dds)),]
 nrow(rldFiltered)
-<<<<<<< HEAD
 #*filter by the ones removed from res3 function, to get rid of ones without the base mean, do we still do this if we didnt filter
-
-#12585
-=======
 #56
->>>>>>> 781be6b9949c6a6fbcca889627509c8dde888991
+
 write.csv(rldFiltered,file="Invasion_wgcna_allgenes.csv",quote=F,row.names=T)
 #now we have our filtered data to take into WGCNA
 
@@ -115,22 +109,8 @@ nrow(dat)
 datExpr0 = as.data.frame(t(dat))
 
 #Don't run, no need for extra filtering? 
-<<<<<<< HEAD
 #*looking for outliers
-gsg = goodSamplesGenes(datExpr0, verbose = 1); #verbose=1 default, change if we want more verbose data ? 
-gsg$allOK #if TRUE, no outlier taxa, if false run the script below
 
-if (!gsg$allOK)
-{if (sum(!gsg$goodGenes)>0)
-  printFlush(paste("Removing genes:", paste(names(datExpr0)[!gsg$goodGenes], collapse= ", ")));
-  if (sum(!gsg$goodSamples)>0)
-    printFlush(paste("Removing samples:", paste(rownames(datExpr0)[!gsg$goodSamples], collapse=", ")))
-  datExpr0= datExpr0[gsg$goodSamples, gsg$goodGenes]
-}
-gsg=goodSamplesGenes(datExpr0, verbose = 1)
-gsg$allOK 
-dim(datExpr0) 
-=======
 #gsg = goodSamplesGenes(datExpr0, verbose = 1); #verbose=1 default, change if we want more verbose data ? 
 #gsg$allOK #if TRUE, no outlier taxa, if false run the script below
 
@@ -144,13 +124,13 @@ dim(datExpr0)
 #gsg=goodSamplesGenes(datExpr0, verbose = 1)
 #gsg$allOK 
 #dim(datExpr0) 
->>>>>>> 781be6b9949c6a6fbcca889627509c8dde888991
+
 #264  #17 taxa excluded #probably don't filter 
 #*if didnt do base mean cut off, may identify some of those genes and toss them
 
 ### Outlier detection incorporated into trait measures. 
 #*make sure trait data is same as Expr0 and names are the same (linking things properly)
-traitData= read.csv("Invasion_traits_WGCNA.csv", row.names=1)
+#traitData= read.csv("Invasion_traits_WGCNA.csv", row.names=1)
 traitData= read.csv("Invasion_traits_WGCNA.csv")
 rownames(traitData)[traitData$Sample_ID=='RV55'] #insert samples removed from purgeoutliers 
 trait.trim <- traitData[-c(21),]
@@ -173,7 +153,7 @@ head(datExpr0)
 #sample dendrogram and trait heat map showing outliers
 A=adjacency(t(datExpr0)) #type back to default, no direction in ITS counts
 #Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
-# this calculates the whole network connectivity we choose unsigned (this is the default) because we are dealing with OTU counts, not gene expression
+# this calculates the whole network connectivity we choose signed (this is the default) because we are dealing with OTU counts, not gene expression
 k=as.numeric(apply(A,2,sum))-1 #Summing columns of adjacency matrix (-1 to account for self correlation) 
 # standardized connectivity
 Z.k=scale(k)
@@ -204,40 +184,39 @@ allowWGCNAThreads()
 lnames = load(file="Invasion_Samples_Traits_ALL.RData")
 
 #Figure out proper SFT
-<<<<<<< HEAD
 #**notes from tutorial: The function adjacency calculates the adjacency matrix from expression data.
 #*Adjacency functions for both weighted and unweighted networks require the user to choose threshold parameters, for example by applying the approximate scale-free topology criterion 
 #*general framework for soft thresholding that weighs each connection, suggested to look at scale-free topology index in WGCNA faq to decide soft threshold based on number of samples
 #*dont want to include all possible data (not be too high) bc then its overfitting wgcna model
 #*emphasizing network on stronger association/larger correlation coefficient and reduce the noise
 # Choose a set of soft-thresholding powers *****what is this?? how do we choose these powers?
-powers = c(seq(1,14,by=2), seq(15,30, by=0.5)); #may need to adjust these power values to hone in on proper sft value
-=======
+powers = c(seq(100, 190,by=10), seq(200,250, by=5))
+powers = c(seq(1, 10, by = 1), seq(12, 20, by = 2))
+; #may need to adjust these power values to hone in on proper sft value
 
 # Choose a set of (candidate) soft-thresholding powers
-powers = c(seq(1, 90, by = 10), seq(100, 200, by = 10)); #default; Producing SFT.R.sq wayyyyy too small 
+#default; Producing SFT.R.sq wayyyyy too small 
 #may need to adjust these power values to hone in on proper sft value
 #soft threshold powers are the power to which co-expression similarity is raised to calculate adjacency 
->>>>>>> 781be6b9949c6a6fbcca889627509c8dde888991
 # Call the network topology analysis function
-sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="unsigned", verbose = 2) #want smallest value, closest to 0.9 (but still under)
+sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="signed", verbose = 2) #want smallest value, closest to 0.9 (but still under)
 #Printing table to help decide estimate for soft power threshold 
 #Soft power threshold chosen based on SFT.R.sq being over .8 and mean k being below the hundreds 
-#should always be less than 15 though for unsigned data 
+#should always be less than 15 though for signed data 
 #https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
 
 #First, the user should ensure that variables (probesets, genes etc.) have not been filtered by 
 #differential expression with respect to a sample trait. (with respect to traits we have not?)
 
 #If the scale-free topology fit index fails to reach values above 0.8 for reasonable powers
-#(less than 15 for unsigned or signed hybrid networks, and less than 30 for signed networks) 
+#(less than 15 for signed or signed hybrid networks, and less than 30 for signed networks) 
 #and the mean connectivity remains relatively high (in the hundreds or above), 
 #chances are that the data exhibit a strong driver that makes a subset of the 
 #samples globally different from the rest. The difference causes high correlation 
 #among large groups of genes which invalidates the assumption of the scale-free topology 
 #approximation.
 
-#If we want to keep the variation then according to FAQ unsigned networks with 20-30 samples should use power threshold of 8 
+#If we want to keep the variation then according to FAQ signed networks with 20-30 samples should use power threshold of 8 
 
 # Plot the results:
 sizeGrWindow(9, 5)
@@ -257,19 +236,16 @@ plot(sft$fitIndices[,1], sft$fitIndices[,5],
      main = paste("Mean connectivity"))
 text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
 
-<<<<<<< HEAD
-softPower=13 #smallest value to plateau at ~0.85
+
 #*looking at the scale dependence graph, make softPower (the soft threshold) the number that is under the 0.9 value suggested
 #*if our scale dependence graph doesnt look great than may need to look online/ask for help
-adjacency=adjacency(datExpr0, power=softPower,type="unsigned") #Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
-=======
-softPower=8 #smallest value to plateau at ~0.85
-adjacency=adjacency(datExpr0, power=softPower,type="unsigned") #must change method type here too!!
+
+softPower=16 #smallest value to plateau at ~0.85
+adjacency=adjacency(datExpr0, power=softPower,type="signed") #must change method type here too!!
 #Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
 
->>>>>>> 781be6b9949c6a6fbcca889627509c8dde888991
 #translate the adjacency into topological overlap matrix and calculate the corresponding dissimilarity:
-TOM= TOMsimilarity(adjacency,TOMType = "unsigned")
+TOM= TOMsimilarity(adjacency,TOMType = "signed")
 dissTOM= 1-TOM
 
 library(flashClust)
@@ -280,34 +256,19 @@ plot(geneTree, xlab="", sub="", main= "Gene Clustering on TOM-based dissimilarit
 # dev.off()
 #each leaf corresponds to a gene, branches grouping together densely are interconnected, highly co-expressed genes
 
-<<<<<<< HEAD
-minModuleSize=90 #*we only want large modules, dependent on size of transcriptome, size should be probably diff for ours. they used 90 bc doing GO enrichment but the base is 30
-dynamicMods= cutreeDynamic(dendro= geneTree, distM= dissTOM, deepSplit=2, pamRespectsDendro= FALSE, minClusterSize= minModuleSize) #DeepSplit: For method "hybrid", can be either logical or integer in the range 0 to 4. For method "tree", must be logical. In both cases, provides a rough control over sensitivity to cluster splitting. The higher the value (or if TRUE), the more and smaller clusters will be produced.
-table(dynamicMods)
 
 #*each module gets a number and a size
-# # dynamicMods
-#dynamicMods
-#1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
-#1164  576  415  325  272  263  259  258  249  244  241  236  232  222  219  212  206  198  192 
-#20   21   22   23   24   25   26   27   28   29   30   31   32   33   34   35   36   37   38 
-#185  184  183  182  180  178  177  176  175  172  170  165  163  158  158  157  157  153  152 
-#39   40   41   42   43   44   45   46   47   48   49   50   51   52   53   54   55   56   57 
-#150  145  144  141  137  137  135  134  133  133  131  130  129  126  123  118  118  116  112 
-#58   59   60   61   62   63   64   65   66 
-#111  104  100   99   97   96   94   93   91
- 
 #*assign color to each module, color represents clusters of coexpressed genes
-=======
 
-minModuleSize=2 #we only want large modules #set to 90 originally (How many taxa do we want? Arbitrary?)
+minModuleSize=5 #we only want large modules #set to 90 originally (How many taxa do we want? Arbitrary?)
+#dependent on size of transcriptome, size should be probably diff for ours. they used 90 bc doing GO enrichment but the base is 30
 dynamicMods= cutreeDynamic(dendro= geneTree, distM= dissTOM, deepSplit=2, pamRespectsDendro= FALSE, minClusterSize= minModuleSize)
 #DeepSplit: For method "hybrid", can be either logical or integer in the range 0 to 4. For method "tree", must be logical. In both cases, provides a rough control over sensitivity to cluster splitting. The higher the value (or if TRUE), the more and smaller clusters will be produced.
 
 table(dynamicMods)
 #5 modules 35 out of 56 taxa not in a module 
+#34 modules with 39 unaccounted 
 
->>>>>>> 781be6b9949c6a6fbcca889627509c8dde888991
 dynamicColors= labels2colors(dynamicMods)
 #plot dendrogram and colors underneath, pretty sweet
 sizeGrWindow(8,6)
@@ -315,24 +276,24 @@ plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= F
 
 #Merge modules whose expression profiles are very similar, 
 #calculate eigengenes
-MEList= moduleEigengenes(datExpr0, colors= dynamicColors,softPower = 13) #*will need to change this to the soft threshold decided earlier
+MEList= moduleEigengenes(datExpr0, colors= dynamicColors,softPower = 16) #*will need to change this to the soft threshold decided earlier
 MEs= MEList$eigengenes
 #Calculate dissimilarity of module eigenegenes
 MEDiss= 1-cor(MEs)
 #Cluster module eigengenes
 METree= flashClust(as.dist(MEDiss), method= "average")
 
-save(dynamicMods, MEList, MEs, MEDiss, METree, file= "Network_crep_nomerge.RData")
+save(dynamicMods, MEList, MEs, MEDiss, METree, file= "Network_invasion_nomerge.RData")
 
-lnames = load(file = "Network_crep_nomerge.RData")
+lnames = load(file = "Network_invasion_nomerge.RData")
 #plot
 sizeGrWindow(7,6)
 plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
 
-MEDissThres= 0.6 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
+MEDissThres= 0 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
 
-merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =3)
+merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =1)
 
 mergedColors= merge$colors
 mergedMEs= merge$newMEs
@@ -349,7 +310,7 @@ MEs=mergedMEs
 #save module colors and labels for use in subsequent parts
 save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.6.RData")
 
-###############Relating modules to traits and finding important genes
+###############Relating modules to traits and finding important genes #I think skip because Taxa already assigned 
 library(WGCNA)
 # The following setting is important, do not omit.
 options(stringsAsFactors = FALSE);
@@ -358,8 +319,9 @@ lnames = load(file = "Crep_Samples_Traits_ALL.RData");
 #The variable lnames contains the names of loaded variables.
 lnames
 # Load network data saved in the second part.
-lnames = load(file = "Network_signed_0.6.RData");
-lnames = load(file = "Network_crep_nomerge.RData");
+
+lnames = load(file = "Network_signed_0.6.RData"); #dont load for original non-merging look 
+lnames = load(file = "Network_invasion_nomerge.RData"); #don't load
 lnames
 
 nGenes = ncol(datExpr0)
@@ -406,8 +368,8 @@ labeledHeatmap(Matrix = moduleTraitCor,
 
 #Gene relationship to trait and important modules:
 # Define variable weight containing the weight column of datTrait - leave weight as variable, but change names in first 2 commands
-weight = as.data.frame(datTraits$pH7.5); #change Lipidrobust to your trait name
-names(weight) = "pH7.5" 
+weight = as.data.frame(datTraits$percN); #change Lipidrobust to your trait name
+names(weight) = "percN" 
 # names (colors) of the modules
 modNames = substring(names(MEs), 3)
 geneModuleMembership = as.data.frame(cor(datExpr0, MEs, use = "p"));
@@ -422,7 +384,7 @@ names(GSPvalue) = paste("p.GS.", names(weight), sep="")
 #*how well things belong to module
 #Gene-trait significance correlation plots
 # par(mfrow=c(2,3))
-module = "coral2" #*change this to the module we're going to look at
+module = "midnightblue" #*change this to the module we're going to look at
 column = match(module, modNames);
 moduleGenes = moduleColors==module;
 sizeGrWindow(7, 7);
@@ -430,11 +392,11 @@ par(mfrow = c(1,1));
 verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    abs(geneTraitSignificance[moduleGenes, 1]),
                    xlab = paste("ModMem in", module, "module"),
-                   ylab = "Gene Sig for pH7.5",
+                   ylab = "Gene Sig for percN",
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 
-#Making VSD files by module for GO plot functions
+#Making VSD files by module for GO plot functions #DONT 
 vs=t(datExpr0)
 cands=names(datExpr0[moduleColors=="coral2"]) #*change this also to the color of module we're looking at
 #black  blue brown green  grey  pink   red 
