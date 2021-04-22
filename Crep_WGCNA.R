@@ -4,7 +4,6 @@
 setwd("/project/bi594/Pine_invasion/")
 library(DESeq2)
 library(BiocManager)
-install.packages('MCMC.OTU')
 library(MCMC.OTU)
 
 load('Environment.4.19.21.RData')
@@ -13,32 +12,33 @@ load('Environment.4.19.21.RData')
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
 
-seq.trim <- purgeOutliers(countData,count.columns=29:282,sampleZcut=-2.5,otu.cut=.035)
+count.trim <- purgeOutliers(countData,count.columns=2:282)
+#Trimmed RV55 sample and a little under 230 taxa; adjust the arguments here; losing too many? too few? 
+rownames(count.trim)=count.trim$cdat
+count.trim$cdat <- NULL
+class(count.trim)
 
-t=read.csv(file="otu.csv", row.names = 1)
-t2<- as.data.frame(lapply(t,as.numeric))
-str(t2)
-
-t2=t(as.matrix(as.data.frame(lapply(t,as.numeric))))
-colnames(t2)=row.names(t)
-
-
-
-length(countDataMatrix[,1])
-head(countDataMatrix)
+t<- t(as.data.frame(lapply(count.trim,as.numeric)))
+colnames(t) <- rownames(count.trim)
+class(t) #t transposes data.frame into a matrix 
+ncol(t)
+nrow(t)
 
 #Read in treatment data
 samdf<- read.csv("variabletable_pi.csv")
-treat=samdf$site_code
+rownames(samdf)[samdf$SampleID=='RV55'] #insert samples removed from purgeoutliers 
+samdf.trim <- samdf[-c(21),]
+treat=samdf.trim$site_code
 g=data.frame(treat)
 g
 colData<- g #create coldata for DESeq 
 
 class(colData)
 str(colData)
+nrow(colData)
 
 
-dds<-DESeqDataSetFromMatrix(countData=t2, colData=colData, design=~ treat) 
+dds<-DESeqDataSetFromMatrix(countData=t, colData=colData, design=~ treat) 
 
 #diagdds = phyloseq_to_deseq2(ps.rarefied, ~ site + position)
 gm_mean = function(x, na.rm=TRUE){
@@ -65,10 +65,10 @@ head(rld)
 rld_wg=(assay(rld)) #Making matrix of rlogTransformation data 
 head(rld_wg)
 nrow(rld_wg)
-#19717
+#56
 rldFiltered=(assay(rld))[(rownames((assay(rld))) %in% rownames(dds)),]
 nrow(rldFiltered)
-#12585
+#56
 write.csv(rldFiltered,file="Invasion_wgcna_allgenes.csv",quote=F,row.names=T)
 #now we have our filtered data to take into WGCNA
 
@@ -95,36 +95,41 @@ dat$X=NULL
 head(dat)
 names(dat)
 nrow(dat)
-#281
+#56
 datExpr0 = as.data.frame(t(dat))
 
 #Don't run, no need for extra filtering? 
-gsg = goodSamplesGenes(datExpr0, verbose = 1); #verbose=1 default, change if we want more verbose data ? 
-gsg$allOK #if TRUE, no outlier taxa, if false run the script below
+#gsg = goodSamplesGenes(datExpr0, verbose = 1); #verbose=1 default, change if we want more verbose data ? 
+#gsg$allOK #if TRUE, no outlier taxa, if false run the script below
 
-if (!gsg$allOK)
-{if (sum(!gsg$goodGenes)>0)
-  printFlush(paste("Removing genes:", paste(names(datExpr0)[!gsg$goodGenes], collapse= ", ")));
-  if (sum(!gsg$goodSamples)>0)
-    printFlush(paste("Removing samples:", paste(rownames(datExpr0)[!gsg$goodSamples], collapse=", ")))
-  datExpr0= datExpr0[gsg$goodSamples, gsg$goodGenes]
-}
-gsg=goodSamplesGenes(datExpr0, verbose = 1)
-gsg$allOK 
-dim(datExpr0) 
+#if (!gsg$allOK)
+#{if (sum(!gsg$goodGenes)>0)
+ # printFlush(paste("Removing genes:", paste(names(datExpr0)[!gsg$goodGenes], collapse= ", ")));
+  #if (sum(!gsg$goodSamples)>0)
+   # printFlush(paste("Removing samples:", paste(rownames(datExpr0)[!gsg$goodSamples], collapse=", ")))
+  #datExpr0= datExpr0[gsg$goodSamples, gsg$goodGenes]
+#}
+#gsg=goodSamplesGenes(datExpr0, verbose = 1)
+#gsg$allOK 
+#dim(datExpr0) 
 #264  #17 taxa excluded #probably don't filter 
 
 ### Outlier detection incorporated into trait measures. 
 traitData= read.csv("Invasion_traits_WGCNA.csv", row.names=1)
-dim(traitData)
-head(traitData)
-names(traitData)
+traitData= read.csv("Invasion_traits_WGCNA.csv")
+rownames(traitData)[traitData$Sample_ID=='RV55'] #insert samples removed from purgeoutliers 
+trait.trim <- traitData[-c(21),]
+rownames(trait.trim) <- trait.trim$Sample_ID
+trait.trim$Sample_ID <- NULL
+dim(trait.trim)
+head(trait.trim)
+names(trait.trim)
 
 # Form a data frame analogous to expression data that will hold the clinical traits.
 dim(datExpr0)
 rownames(datExpr0)
 # datTraits=allTraits
-datTraits=traitData
+datTraits=trait.trim
 
 table(rownames(datTraits)==rownames(datExpr0)) #should return TRUE if datasets align correctly, otherwise your names are out of order
 head(datTraits)
@@ -153,7 +158,7 @@ plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,ma
 # datExpr=datExpr0[!remove.samples,]
 # datTraits=datTraits[!remove.samples,]
 
-save(datExpr0, datTraits, file="Invasion_Samples_Traits_ALL.RData")
+save(datExpr0,datTraits, file="Invasion_Samples_Traits_ALL.RData")
 
 ################Moving on!  Network construction and module detection - this section can take a lot of time you might consider running it on a cluster for a larger dataset
 library(WGCNA)
@@ -164,10 +169,29 @@ allowWGCNAThreads()
 lnames = load(file="Invasion_Samples_Traits_ALL.RData")
 
 #Figure out proper SFT
-# Choose a set of soft-thresholding powers
-powers = c(seq(1,14,by=2), seq(15,30, by=0.5)); #may need to adjust these power values to hone in on proper sft value
+# Choose a set of (candidate) soft-thresholding powers
+powers = c(seq(1, 90, by = 10), seq(100, 200, by = 10)); #default; Producing SFT.R.sq wayyyyy too small 
+#may need to adjust these power values to hone in on proper sft value
+#soft threshold powers are the power to which co-expression similarity is raised to calculate adjacency 
 # Call the network topology analysis function
-sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="signed", verbose = 2) #want smallest value, closest to 0.9 (but still under)
+sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="unsigned", verbose = 2) #want smallest value, closest to 0.9 (but still under)
+#Printing table to help decide estimate for soft power threshold 
+#Soft power threshold chosen based on SFT.R.sq being over .8 and mean k being below the hundreds 
+#should always be less than 15 though for unsigned data 
+#https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+
+#First, the user should ensure that variables (probesets, genes etc.) have not been filtered by 
+#differential expression with respect to a sample trait. (with respect to traits we have not?)
+
+#If the scale-free topology fit index fails to reach values above 0.8 for reasonable powers
+#(less than 15 for unsigned or signed hybrid networks, and less than 30 for signed networks) 
+#and the mean connectivity remains relatively high (in the hundreds or above), 
+#chances are that the data exhibit a strong driver that makes a subset of the 
+#samples globally different from the rest. The difference causes high correlation 
+#among large groups of genes which invalidates the assumption of the scale-free topology 
+#approximation.
+
+#If we want to keep the variation then according to FAQ unsigned networks with 20-30 samples should use power threshold of 8 
 
 # Plot the results:
 sizeGrWindow(9, 5)
@@ -187,10 +211,10 @@ plot(sft$fitIndices[,1], sft$fitIndices[,5],
      main = paste("Mean connectivity"))
 text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
 
-softPower=13 #smallest value to plateau at ~0.85
-adjacency=adjacency(datExpr0, power=softPower,type="signed") #must change method type here too!!
+softPower=8 #smallest value to plateau at ~0.85
+adjacency=adjacency(datExpr0, power=softPower,type="unsigned") #must change method type here too!!
 #translate the adjacency into topological overlap matrix and calculate the corresponding dissimilarity:
-TOM= TOMsimilarity(adjacency,TOMType = "signed")
+TOM= TOMsimilarity(adjacency,TOMType = "unsigned")
 dissTOM= 1-TOM
 
 library(flashClust)
@@ -201,20 +225,10 @@ plot(geneTree, xlab="", sub="", main= "Gene Clustering on TOM-based dissimilarit
 # dev.off()
 #each leaf corresponds to a gene, branches grouping together densely are interconnected, highly co-expressed genes
 
-minModuleSize=90 #we only want large modules
+minModuleSize=2 #we only want large modules #set to 90 originally (How many taxa do we want? Arbitrary?)
 dynamicMods= cutreeDynamic(dendro= geneTree, distM= dissTOM, deepSplit=2, pamRespectsDendro= FALSE, minClusterSize= minModuleSize)
 table(dynamicMods)
-
-# # dynamicMods
-#dynamicMods
-#1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
-#1164  576  415  325  272  263  259  258  249  244  241  236  232  222  219  212  206  198  192 
-#20   21   22   23   24   25   26   27   28   29   30   31   32   33   34   35   36   37   38 
-#185  184  183  182  180  178  177  176  175  172  170  165  163  158  158  157  157  153  152 
-#39   40   41   42   43   44   45   46   47   48   49   50   51   52   53   54   55   56   57 
-#150  145  144  141  137  137  135  134  133  133  131  130  129  126  123  118  118  116  112 
-#58   59   60   61   62   63   64   65   66 
-#111  104  100   99   97   96   94   93   91
+#5 modules 35 out of 56 taxa not in a module 
 
 dynamicColors= labels2colors(dynamicMods)
 #plot dendrogram and colors underneath, pretty sweet
