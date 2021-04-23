@@ -15,7 +15,7 @@ countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
 
 count.trim <- purgeOutliers(countData,count.columns=2:282, otu.cut= .000000000001)
-count.trim <- purgeOutliers(countData,count.columns=2:282)
+#count.trim <- purgeOutliers(countData,count.columns=2:282)
 #Trimmed RV55 sample and a little under 230 taxa; adjust the arguments here; losing too many? too few? 
 rownames(count.trim)=count.trim$cdat
 count.trim$cdat <- NULL
@@ -27,7 +27,7 @@ class(t) #t transposes data.frame into a matrix
 sapply(t, is.numeric)
 ncol(t)
 nrow(t)
-
+colnames(t) = c("PL1.1", "PL1.2", "PL1.3", "PL1.4", "PL1.5", "UN1.1", "UN1.2", "UN1.3","UN1.4","UN1.5", "INV1.1", "INV1.2", "INV1.3", "INV1.4", "PL2.1", "PL2.2", "PL2.3", "PL2.4", "PL2.5", "UN2.1", "UN2.3", "UN2.4", "UN2.5", "INV2.1", "INV2.2", "INV2.3", "INV2.4", "INV2.5")
 
 #Read in treatment data
 samdf<- read.csv("variabletable_pi.csv")
@@ -73,13 +73,13 @@ head(rld)
 rld_wg=(assay(rld)) #Making matrix of rlogTransformation data 
 head(rld_wg)
 nrow(rld_wg)
-#56
+#281
 rldFiltered=(assay(rld))[(rownames((assay(rld))) %in% rownames(dds)),]
 nrow(rldFiltered)
 #*filter by the ones removed from res3 function, to get rid of ones without the base mean, do we still do this if we didnt filter
-#56
+#281
 
-write.csv(rldFiltered,file="Invasion_wgcna_allgenes.csv",quote=F,row.names=T)
+write.csv(rldFiltered,file="Invasion_wgcna_allgenes2.csv",quote=F,row.names=T)
 #now we have our filtered data to take into WGCNA
 
 #source("http://bioconductor.org/biocLite.R") #To download DESeq package (you can comment these lines out, they only need to be run once ever)
@@ -97,7 +97,7 @@ library(flashClust)
 options(stringsAsFactors=FALSE)
 allowWGCNAThreads()
 
-dat=read.csv("Invasion_wgcna_allgenes.csv")
+dat=read.csv("Invasion_wgcna_allgenes2.csv")
 head(dat) 
 rownames(dat)<-dat$X
 head(dat)
@@ -145,6 +145,7 @@ dim(datExpr0)
 rownames(datExpr0)
 # datTraits=allTraits
 datTraits=trait.trim
+row.names(datTraits)= c("PL1.1", "PL1.2", "PL1.3", "PL1.4", "PL1.5", "UN1.1", "UN1.2", "UN1.3","UN1.4","UN1.5", "INV1.1", "INV1.2", "INV1.3", "INV1.4", "PL2.1", "PL2.2", "PL2.3", "PL2.4", "PL2.5", "UN2.1", "UN2.3", "UN2.4", "UN2.5", "INV2.1", "INV2.2", "INV2.3", "INV2.4", "INV2.5")
 
 table(rownames(datTraits)==rownames(datExpr0)) #should return TRUE if datasets align correctly, otherwise your names are out of order
 head(datTraits)
@@ -173,7 +174,7 @@ plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,ma
 # datExpr=datExpr0[!remove.samples,]
 # datTraits=datTraits[!remove.samples,]
 
-save(datExpr0,datTraits, file="Invasion_Samples_Traits_ALL.RData")
+save(datExpr0,datTraits, file="Invasion_Samples_Traits_ALL2.RData")
 
 ################Moving on!  Network construction and module detection - this section can take a lot of time you might consider running it on a cluster for a larger dataset
 library(WGCNA)
@@ -181,7 +182,7 @@ library(flashClust)
 options(stringsAsFactors = FALSE)
 #enableWGCNAThreads use this in base R
 allowWGCNAThreads() 
-lnames = load(file="Invasion_Samples_Traits_ALL.RData")
+lnames = load(file="Invasion_Samples_Traits_ALL2.RData")
 
 #Figure out proper SFT
 #**notes from tutorial: The function adjacency calculates the adjacency matrix from expression data.
@@ -283,14 +284,14 @@ MEDiss= 1-cor(MEs)
 #Cluster module eigengenes
 METree= flashClust(as.dist(MEDiss), method= "average")
 
-save(dynamicMods, MEList, MEs, MEDiss, METree, file= "Network_invasion_nomerge.RData")
+save(dynamicMods, MEList, MEs, MEDiss, METree, file= "Network_invasion_0.7.RData")
 
-lnames = load(file = "Network_invasion_nomerge.RData")
+lnames = load(file = "Network_invasion_0.7.RData")
 #plot
 sizeGrWindow(7,6)
 plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
 
-MEDissThres= 0.6 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
+MEDissThres= 0.65 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
 
 merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =1)
@@ -317,12 +318,12 @@ options(stringsAsFactors = FALSE);
 # Load the expression and trait data saved in the first part
 #lnames = load(file = "Network_invasion_nomerge.RData");
 #The variable lnames contains the names of loaded variables.
-lnames
+#lnames
 # Load network data saved in the second part.
 
 #lnames = load(file = "Network_signed_0.6.RData"); #dont load for original non-merging look 
 #lnames = load(file = "Network_invasion_nomerge.RData"); #don't load
-lnames
+#lnames
 
 nGenes = ncol(datExpr0)
 nSamples = nrow(datExpr0)
@@ -417,7 +418,7 @@ verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
 ##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
 #names(dis)
 sizeGrWindow(8,7);
-which.module="midnightblue" #*change this also to the color of module we're looking at 
+which.module="black" #*change this also to the color of module we're looking at 
 #pick module of interest
 ME=MEs[, paste("ME",which.module, sep="")]
 genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
