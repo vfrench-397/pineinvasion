@@ -290,7 +290,7 @@ lnames = load(file = "Network_invasion_nomerge.RData")
 sizeGrWindow(7,6)
 plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
 
-MEDissThres= 0 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
+MEDissThres= 0.6 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
 
 merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =1)
@@ -298,7 +298,7 @@ merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbos
 mergedColors= merge$colors
 mergedMEs= merge$newMEs
 
-pdf(file="MergeNetwork.pdf", width=20, height=20) 
+pdf(file="MergeNetwork0.7.pdf", width=20, height=20) 
 plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
 dev.off()
 
@@ -308,20 +308,20 @@ moduleLabels= match(moduleColors, colorOrder)-1
 MEs=mergedMEs
 
 #save module colors and labels for use in subsequent parts
-save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.6.RData")
+save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.7.RData")
 
 ###############Relating modules to traits and finding important genes #I think skip because Taxa already assigned 
 library(WGCNA)
 # The following setting is important, do not omit.
 options(stringsAsFactors = FALSE);
 # Load the expression and trait data saved in the first part
-lnames = load(file = "Crep_Samples_Traits_ALL.RData");
+#lnames = load(file = "Network_invasion_nomerge.RData");
 #The variable lnames contains the names of loaded variables.
 lnames
 # Load network data saved in the second part.
 
-lnames = load(file = "Network_signed_0.6.RData"); #dont load for original non-merging look 
-lnames = load(file = "Network_invasion_nomerge.RData"); #don't load
+#lnames = load(file = "Network_signed_0.6.RData"); #dont load for original non-merging look 
+#lnames = load(file = "Network_invasion_nomerge.RData"); #don't load
 lnames
 
 nGenes = ncol(datExpr0)
@@ -396,28 +396,28 @@ verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 
-#Making VSD files by module for GO plot functions #DONT 
-vs=t(datExpr0)
-cands=names(datExpr0[moduleColors=="coral2"]) #*change this also to the color of module we're looking at
-#black  blue brown green  grey  pink   red 
-
-#*subsetting the genes in this module
-c.vsd=vs[rownames(vs) %in% cands,]
-head(c.vsd)
-nrow(c.vsd) #should correspond to module size
-table(moduleColors)
-#moduleColors
-#black         blue       coral2     darkgrey  floralwhite       grey60        ivory 
-#1338         2928         1167         1088          895          206          564 
-#mediumorchid   orangered4       purple    steelblue 
-#478         1557          615         1749
-head(c.vsd)
-write.csv(c.vsd,"rlog_MMcoral2.csv",quote=F)
+# #Making VSD files by module for GO plot functions #DONT 
+# vs=t(datExpr0)
+# cands=names(datExpr0[moduleColors=="coral2"]) #*change this also to the color of module we're looking at
+# #black  blue brown green  grey  pink   red 
+# 
+# #*subsetting the genes in this module
+# c.vsd=vs[rownames(vs) %in% cands,]
+# head(c.vsd)
+# nrow(c.vsd) #should correspond to module size
+# table(moduleColors)
+# #moduleColors
+# #black         blue       coral2     darkgrey  floralwhite       grey60        ivory 
+# #1338         2928         1167         1088          895          206          564 
+# #mediumorchid   orangered4       purple    steelblue 
+# #478         1557          615         1749
+# head(c.vsd)
+# write.csv(c.vsd,"rlog_MMcoral2.csv",quote=F)
 
 ##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
 #names(dis)
 sizeGrWindow(8,7);
-which.module="coral2" #*change this also to the color of module we're looking at 
+which.module="midnightblue" #*change this also to the color of module we're looking at 
 #pick module of interest
 ME=MEs[, paste("ME",which.module, sep="")]
 genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
@@ -435,9 +435,9 @@ barplot(ME, col=which.module, main="", cex.main=2,
 #*didnt do this in class but may want to create something that ranks phenotype with gene expression (as traits increase or decrease)
 #here we just have binary traits, but if you have a continuous trait this code is cool
 sizeGrWindow(8,7);
-which.module="yellow" #pick module of interest
-which.trait="fvfm" #change trait of interest here
-datTraits=datTraits[order((datTraits$fvfm),decreasing=T),]#change trait of interest here
+which.module="midnightblue" #pick module of interest
+which.trait="percN" #change trait of interest here
+datTraits=datTraits[order((datTraits$percN),decreasing=T),]#change trait of interest here
 
 trait=datTraits[, paste(which.trait)]
 genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
@@ -448,7 +448,7 @@ par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
 plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
 par(mar=c(5, 4.2, 0, 0.7))
 barplot(trait, col=which.module, main="", cex.main=2,
-        ylab="fvfm",xlab="sample")#change trait of interest here
+        ylab="percN",xlab="sample")#change trait of interest here
 
 #*how well it belongs to module
 #Gene relationship to trait and important modules: Gene Significance and Module membership
@@ -461,11 +461,11 @@ head(gg)
 library(pheatmap)
 
 ############################################
-whichModule="coral2" #*color change
+whichModule="midnightblue" #*color change
 top=100
 
 datME=MEs
-vsd <- read.csv("Crep_wgcna_allgenes.csv", row.names=1)
+vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
 head(vsd)
 datExpr=t(vsd)
 modcol=paste("kME",whichModule,sep="")
@@ -502,13 +502,13 @@ pheatmap(hubs,scale="row",col=contrasting,border_color=NA, main=paste(whichModul
 #*if we wanna do fisher, ask for the modified code bc something is wrong with this (bc sum is not same number in module)
 #*kME is how well that gene belongs to the module 
 library(WGCNA)
-vsd <- read.csv("Crep_wgcna_allgenes.csv", row.names=1)
+vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
 head(vsd)
 options(stringsAsFactors=FALSE)
 data=t(vsd)
 allkME =as.data.frame(signedKME(data, MEs))
 
-whichModule="coral2" #*name your color and execute to the end
+whichModule="midnightblue" #*name your color and execute to the end
 
 length(moduleColors)
 inModule=data.frame("module"=rep(0,nrow(vsd)))
@@ -520,6 +520,9 @@ head(inModule)
 write.csv(inModule,file=paste(whichModule,"_fisher.csv",sep=""),quote=F)
 #*sum is sanity check, should be the same number that was in the module
 
+#know which genera are in each module
+midnightblue <- subset(inModule, module=="1")
+
 #*this gives kME and input for 
 #*series of how well gene belongs in module
 modColName=paste("kME",whichModule,sep="")
@@ -530,4 +533,4 @@ write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
 
 ######--------------------end--------------------#######
 
-save.image(file='Environment.4.21.21.RData')
+save.image(file='Environment.4.22.21.RData')
