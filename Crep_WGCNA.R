@@ -1,14 +1,16 @@
 ########################################################################################################
 #Get all genes into WGCNA but remove the genes with low basemean values
+
 #navigate into the correct directory
 setwd("/project/bi594/Pine_invasion/")
+
 library(WGCNA)
 library(flashClust)
 library(DESeq2)
 library(BiocManager)
 library(MCMC.OTU)
 
-load('Environment.4.20.21.RData')
+load('Environment.4.23.21.RData')
 
 #Merge count table with Genus IDs
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
@@ -291,7 +293,7 @@ lnames = load(file = "Network_invasion_0.7.RData")
 sizeGrWindow(7,6)
 plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
 
-MEDissThres= 0.65 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
+MEDissThres= 0.7 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
 
 merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =1)
@@ -329,11 +331,6 @@ nGenes = ncol(datExpr0)
 nSamples = nrow(datExpr0)
 table(moduleColors)
 #*can pick which colors you want to further explore
-#moduleColors
-#black         blue       coral2     darkgrey  floralwhite       grey60        ivory 
-#1338         2928         1167         1088          895          206          564 
-#mediumorchid   orangered4       purple    steelblue 
-#478         1557          615         1749 
 
 # Recalculate MEs with color labels
 MEs0 = moduleEigengenes(datExpr0, moduleColors)$eigengenes
@@ -369,8 +366,8 @@ labeledHeatmap(Matrix = moduleTraitCor,
 
 #Gene relationship to trait and important modules:
 # Define variable weight containing the weight column of datTrait - leave weight as variable, but change names in first 2 commands
-weight = as.data.frame(datTraits$percN); #change Lipidrobust to your trait name
-names(weight) = "percN" 
+weight = as.data.frame(datTraits$percC); #change Lipidrobust to your trait name
+names(weight) = "percC" 
 # names (colors) of the modules
 modNames = substring(names(MEs), 3)
 geneModuleMembership = as.data.frame(cor(datExpr0, MEs, use = "p"));
@@ -393,32 +390,27 @@ par(mfrow = c(1,1));
 verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    abs(geneTraitSignificance[moduleGenes, 1]),
                    xlab = paste("ModMem in", module, "module"),
-                   ylab = "Gene Sig for percN",
+                   ylab = "Gene Sig for %C",
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 
-# #Making VSD files by module for GO plot functions #DONT 
-# vs=t(datExpr0)
-# cands=names(datExpr0[moduleColors=="coral2"]) #*change this also to the color of module we're looking at
-# #black  blue brown green  grey  pink   red 
-# 
-# #*subsetting the genes in this module
-# c.vsd=vs[rownames(vs) %in% cands,]
-# head(c.vsd)
-# nrow(c.vsd) #should correspond to module size
-# table(moduleColors)
-# #moduleColors
-# #black         blue       coral2     darkgrey  floralwhite       grey60        ivory 
-# #1338         2928         1167         1088          895          206          564 
-# #mediumorchid   orangered4       purple    steelblue 
-# #478         1557          615         1749
-# head(c.vsd)
-# write.csv(c.vsd,"rlog_MMcoral2.csv",quote=F)
+#Making VSD files by module - so we can tell what genera are in each module
+vs=t(datExpr0)
+cands=names(datExpr0[moduleColors=="midnightblue"]) #*change this also to the color of module we're looking at
+#black  blue brown green  grey  pink   red
+
+#*subsetting the genes in this module
+c.vsd=vs[rownames(vs) %in% cands,]
+head(c.vsd)
+nrow(c.vsd) #should correspond to module size
+table(moduleColors) #check module sizes here
+head(c.vsd)
+write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
 
 ##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
 #names(dis)
 sizeGrWindow(8,7);
-which.module="black" #*change this also to the color of module we're looking at 
+which.module="midnightblue" #*change this also to the color of module we're looking at 
 #pick module of interest
 ME=MEs[, paste("ME",which.module, sep="")]
 genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
@@ -437,7 +429,7 @@ barplot(ME, col=which.module, main="", cex.main=2,
 #here we just have binary traits, but if you have a continuous trait this code is cool
 sizeGrWindow(8,7);
 which.module="midnightblue" #pick module of interest
-which.trait="percN" #change trait of interest here
+which.trait="percC" #change trait of interest here
 datTraits=datTraits[order((datTraits$percN),decreasing=T),]#change trait of interest here
 
 trait=datTraits[, paste(which.trait)]
@@ -449,22 +441,19 @@ par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
 plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
 par(mar=c(5, 4.2, 0, 0.7))
 barplot(trait, col=which.module, main="", cex.main=2,
-        ylab="percN",xlab="sample")#change trait of interest here
+        ylab="%C",xlab="sample")#change trait of interest here
 
 #*how well it belongs to module
 #Gene relationship to trait and important modules: Gene Significance and Module membership
 allkME =as.data.frame(signedKME(t(dat), MEs))
 head(allkME)
-vsd=read.csv(file="rlog_MMcoral2.csv", row.names=1)
+vsd=read.csv(file="rlog_MMmidnightblue.csv", row.names=1)
 head(vsd)
-gg=read.table("Crep454_iso2gene.tab", sep="\t")
-head(gg)
 library(pheatmap)
 
 ############################################
 whichModule="midnightblue" #*color change
-top=100
-
+top=100 #top 100 genes, but we only have <100 genera, so it doesn't matter
 datME=MEs
 vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
 head(vsd)
@@ -476,32 +465,40 @@ hubs=sorted[1:top,]
 # attaching gene names
 summary(hubs)
 
-#*labelling row names with the gene names from gg, and can see how many are significantly differentially expressed
-gnames=c();counts=0
-for(i in 1:length(hubs[,1])) {
-  if (row.names(hubs)[i] %in% gg$V1) { 
-    counts=counts+1
-    gn=gg[gg$V1==row.names(hubs)[i],2]
-    if (gn %in% gnames) {
-      gn=paste(gn,counts,sep=".")
-    }
-    gnames=append(gnames,gn) 
-  } else { 
-    gnames=append(gnames,i)
-  }
-} 
-row.names(hubs)=gnames
-length(hubs)
-
 contrasting = colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
 #quartz()
-pheatmap(hubs,scale="row",col=contrasting,border_color=NA, main=paste(whichModule,"top",top,"kME",sep=""))
+setwd("/project/bi594/Pine_invasion/Figures/")
+png(file="pheatmap_midnightblue.png", width=1000, height=1500)
+pheatmap(hubs,scale="row",col=contrasting,border_color=NA, main=paste(whichModule,"kME",sep=""))
+dev.off()
+setwd("/project/bi594/Pine_invasion/")
+
+# #*labelling row names with the gene names from gg, and can see how many are significantly differentially expressed
+# gnames=c();counts=0
+# for(i in 1:length(hubs[,1])) {
+#   if (row.names(hubs)[i] %in% gg$V1) { 
+#     counts=counts+1
+#     gn=gg[gg$V1==row.names(hubs)[i],2]
+#     if (gn %in% gnames) {
+#       gn=paste(gn,counts,sep=".")
+#     }
+#     gnames=append(gnames,gn) 
+#   } else { 
+#     gnames=append(gnames,i)
+#   }
+# } 
+# row.names(hubs)=gnames
+# length(hubs)
+
 
 ###fisher for GO
 ##########fisher of module vs whole dataset
 #*fisher is binary value of 1  or 0, (1 if in module or 0 if its not)
 #*if we wanna do fisher, ask for the modified code bc something is wrong with this (bc sum is not same number in module)
 #*kME is how well that gene belongs to the module 
+
+
+#Know which genera are in a given module
 library(WGCNA)
 vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
 head(vsd)
@@ -522,7 +519,17 @@ write.csv(inModule,file=paste(whichModule,"_fisher.csv",sep=""),quote=F)
 #*sum is sanity check, should be the same number that was in the module
 
 #know which genera are in each module
+yellow <- subset(inModule, module=="1")
+yellow <- row.names(yellow)
+yellow
+
+grey <- subset(inModule, module=="1")
+grey <- row.names(grey)
+grey
+
 midnightblue <- subset(inModule, module=="1")
+midnightblue <- row.names(midnightblue)
+midnightblue
 
 #*this gives kME and input for 
 #*series of how well gene belongs in module
@@ -532,6 +539,48 @@ row.names(modkME)=row.names(allkME)
 names(modkME)=modColName
 write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
 
+#make a subset of the yellow kMEs for only the genera in the yellow module
+ykmeinput<- paste(yellow, sep=",")
+yellowkme<- subset(modkME, rownames(modkME) %in% ykmeinput)
+Genus <- rownames(yellowkme)
+rownames(yellowkme) <- NULL
+yellowkme <- cbind(Genus,yellowkme)
+
+#plot the kMEs to show which genera fit best into the module
+ggplot(data= yellowkme, aes(x=reorder(Genus, -kMEyellow), y=kMEyellow)) + 
+  geom_bar(color= "black", fill="yellow", stat="identity") +
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
+  labs(x="Genus", y="kME")
+
+################
+#make a subset of the grey kMEs for only the genera in the grey module
+gkmeinput<- paste(grey, sep=",")
+greykme<- subset(modkME, rownames(modkME) %in% gkmeinput)
+Genus <- rownames(greykme)
+rownames(greykme) <- NULL
+greykme <- cbind(Genus,greykme)
+
+#plot the kMEs to show which genera fit best into the module
+ggplot(data= greykme, aes(x=reorder(Genus, -kMEgrey), y=kMEgrey)) + 
+  geom_bar(fill="grey", stat="identity") +
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
+  labs(x="Genus", y="kME")
+
+#########
+#make a subset of the midnightblue kMEs for only the genera in the midnightblue module
+mbkmeinput<- paste(midnightblue, sep=",")
+midnightbluekme<- subset(modkME, rownames(modkME) %in% mbkmeinput)
+Genus <- rownames(midnightbluekme)
+rownames(midnightbluekme) <- NULL
+midnightbluekme <- cbind(Genus,midnightbluekme)
+
+#plot the kMEs to show which genera fit best into the module
+ggplot(data= midnightbluekme, aes(x=reorder(Genus, -kMEmidnightblue), y=kMEmidnightblue)) + 
+  geom_bar(fill="midnightblue", stat="identity") +
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
+  labs(x="Genus", y="kME")
+
+
 ######--------------------end--------------------#######
 
-save.image(file='Environment.4.22.21.RData')
+save.image(file='Environment.4.25.21.RData')
