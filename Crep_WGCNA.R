@@ -10,7 +10,7 @@ library(DESeq2)
 library(BiocManager)
 library(MCMC.OTU)
 
-load('Environment.4.23.21.RData')
+load('Environment.4.25.21.RData')
 
 #Merge count table with Genus IDs
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
