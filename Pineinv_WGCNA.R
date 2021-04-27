@@ -58,16 +58,8 @@ geoMeans = apply(counts(dds), 1, gm_mean)
 dds = estimateSizeFactors(dds, geoMeans = geoMeans)
 dds = DESeq(dds, fitType="local")
 
-#dds<-DESeq(dds)
-
-
-#res<- results(dds)
-#filter for contigs with average(baseMean) >3 ****
-#res3<-res[res$baseMean>3, ]
-#dim(res) #281
-#dim(res3) #56
-#Didn't filter any counts 
-#Not filtering by base mean because basemean filter formatted for gene counts, not OTU abundance data. Filtering previously with purgeOutliers function. 
+ 
+#Not filtering by base mean before rlog transforing the data because basemean filter formatted for gene counts, not OTU abundance data. Filtering previously with purgeOutliers function. 
 
 # get rlog data (better transformation when size factors vary across samples)
 rld <- rlogTransformation(dds, blind=TRUE, fitType="local")
@@ -86,14 +78,6 @@ nrow(rldFiltered)
 write.csv(rldFiltered,file="Invasion_wgcna_allgenes2.csv",quote=F,row.names=T)
 #now we have our filtered data to take into WGCNA
 
-#source("http://bioconductor.org/biocLite.R") #To download DESeq package (you can comment these lines out, they only need to be run once ever)
-#biocLite("WGCNA")
-#biocLite("flashClust")
-#If using R version or greater you need to use BiocManager instead:
-#if (!requireNamespace("BiocManager", quietly = TRUE))
-#  install.packages("BiocManager")
-#BiocManager::install("WGCNA")
-#^This should download both WGCNA and flashClust
 
 ####First part of tutorial:Data input and cleaning
 library(WGCNA)
@@ -112,25 +96,6 @@ nrow(dat)
 #56
 datExpr0 = as.data.frame(t(dat))
 
-#Don't run, no need for extra filtering? 
-#*looking for outliers
-
-#gsg = goodSamplesGenes(datExpr0, verbose = 1); #verbose=1 default, change if we want more verbose data ? 
-#gsg$allOK #if TRUE, no outlier taxa, if false run the script below
-
-#if (!gsg$allOK)
-#{if (sum(!gsg$goodGenes)>0)
- # printFlush(paste("Removing genes:", paste(names(datExpr0)[!gsg$goodGenes], collapse= ", ")));
-  #if (sum(!gsg$goodSamples)>0)
-   # printFlush(paste("Removing samples:", paste(rownames(datExpr0)[!gsg$goodSamples], collapse=", ")))
-  #datExpr0= datExpr0[gsg$goodSamples, gsg$goodGenes]
-#}
-#gsg=goodSamplesGenes(datExpr0, verbose = 1)
-#gsg$allOK 
-#dim(datExpr0) 
-
-#264  #17 taxa excluded #probably don't filter 
-#*if didnt do base mean cut off, may identify some of those genes and toss them
 
 ### Outlier detection incorporated into trait measures. 
 #*make sure trait data is same as Expr0 and names are the same (linking things properly)
@@ -173,14 +138,11 @@ datColors=data.frame(outlierC=outlierColor,traitColors)
 plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,main="Sample dendrogram and trait heatmap")
 #no outliers 
 
-# Remove outlying samples from expression and trait data
-# remove.samples= Z.k<thresholdZ.k | is.na(Z.k)
-# datExpr=datExpr0[!remove.samples,]
-# datTraits=datTraits[!remove.samples,]
 
 save(datExpr0,datTraits, file="Invasion_Samples_Traits_ALL2.RData")
 
 #################Victoria
+######################### NETWORK CONSTRUCTION AND MODULE DETECTION ######################
 ################Moving on!  Network construction and module detection - this section can take a lot of time you might consider running it on a cluster for a larger dataset
 library(WGCNA)
 library(flashClust)
@@ -189,6 +151,7 @@ options(stringsAsFactors = FALSE)
 allowWGCNAThreads() 
 lnames = load(file="Invasion_Samples_Traits_ALL2.RData")
 
+###################### SOFT POWER THRESHOLD #####################
 #Figure out proper SFT
 #**notes from tutorial: The function adjacency calculates the adjacency matrix from expression data.
 #*Adjacency functions for both weighted and unweighted networks require the user to choose threshold parameters, for example by applying the approximate scale-free topology criterion 
@@ -251,6 +214,7 @@ adjacency=adjacency(datExpr0, power=softPower,type="signed") #must change method
 #Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
 
 ##################Corinne
+############################### INITIAL DENDROGRAM ##############################
 #translate the adjacency into topological overlap matrix and calculate the corresponding dissimilarity:
 TOM= TOMsimilarity(adjacency,TOMType = "signed")
 dissTOM= 1-TOM
@@ -281,6 +245,7 @@ dynamicColors= labels2colors(dynamicMods)
 sizeGrWindow(8,6)
 plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang= 0.05, main= "Gene dendrogram and module colors")
 
+################ MERGING ##############################
 #Merge modules whose expression profiles are very similar, 
 #calculate eigengenes
 MEList= moduleEigengenes(datExpr0, colors= dynamicColors,softPower = 16) #*will need to change this to the soft threshold decided earlier
@@ -317,7 +282,8 @@ MEs=mergedMEs
 #save module colors and labels for use in subsequent parts
 save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.7.RData")
 
-###############Relating modules to traits and finding important genes #I think skip because Taxa already assigned 
+#############################################################
+#Relating modules to traits and finding important genes #I think skip because Taxa already assigned 
 library(WGCNA)
 # The following setting is important, do not omit.
 options(stringsAsFactors = FALSE);
@@ -342,10 +308,9 @@ MEs = orderMEs(MEs0)
 moduleTraitCor = cor(MEs, datTraits, use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
 
+####################### MODULE HEATMAP #####################################
 #represent module trait correlations as a heatmap
-#*quartz()
-#*sizeGrWindow(10,6)
-#* unsure what that does but didnt have to do it in lecture
+
 # Will display correlations and their p-values
 textMatrix = paste(signif(moduleTraitCor, 2), "\n(",
                    signif(moduleTraitPvalue, 1), ")", sep = "");
@@ -365,9 +330,10 @@ labeledHeatmap(Matrix = moduleTraitCor,
                main = paste("Module-trait relationships"))
 
 #*when see groups of modules that are all hot or all cold, they should be merged. this will have it more likely detect enrichment
-#* can change MEDissThres= 0.6 based on this heatmap
+#* can change MEDissThres= 0.7 based on this heatmap
 #* can see tight correlations, what percentage of variation is explained by certain relationships and look for modules that are doing the same thing
 
+######################### RELATING MODULES TO TRAITS #######################
 #Gene relationship to trait and important modules:
 # Define variable weight containing the weight column of datTrait - leave weight as variable, but change names in first 2 commands
 weight = as.data.frame(datTraits$percC); #change Lipidrobust to your trait name
@@ -383,6 +349,7 @@ GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSam
 names(geneTraitSignificance) = paste("GS.", names(weight), sep="");
 names(GSPvalue) = paste("p.GS.", names(weight), sep="")
 
+##################### MODULE CORRELATION PLOT ####################
 #*how well things belong to module
 #Gene-trait significance correlation plots
 # par(mfrow=c(2,3))
@@ -398,6 +365,7 @@ verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 
+########################## VSD FILES BY MODULE ###################### 
 #Making VSD files by module - so we can tell what genera are in each module
 vs=t(datExpr0)
 cands=names(datExpr0[moduleColors=="midnightblue"]) #*change this also to the color of module we're looking at
@@ -411,97 +379,11 @@ table(moduleColors) #check module sizes here
 head(c.vsd)
 write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
 
-##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
-#names(dis)
-sizeGrWindow(8,7);
-which.module="midnightblue" #*change this also to the color of module we're looking at 
-#pick module of interest
-ME=MEs[, paste("ME",which.module, sep="")]
-genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
-
-#quartz()
-# par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
-par(mfrow=c(2,1), mar=c(0.3, 5.5, 5, 2))
-plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
-par(mar=c(5, 4.2, 0, 0.7))
-barplot(ME, col=which.module, main="", cex.main=2,
-        ylab="eigengene expression",xlab="sample")
-#this is a cool plot where you can see that genes in this module are upregulated in the pH7.5 treatment
-
-##############################heatmap of module expression with bar plot of trait of interest by sample...
-#*didnt do this in class but may want to create something that ranks phenotype with gene expression (as traits increase or decrease)
-#here we just have binary traits, but if you have a continuous trait this code is cool
-sizeGrWindow(8,7);
-which.module="midnightblue" #pick module of interest
-which.trait="percC" #change trait of interest here
-datTraits=datTraits[order((datTraits$percN),decreasing=T),]#change trait of interest here
-
-trait=datTraits[, paste(which.trait)]
-genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
-genes=genes[rownames(datTraits),]
-
-#quartz()
-par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
-plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
-par(mar=c(5, 4.2, 0, 0.7))
-barplot(trait, col=which.module, main="", cex.main=2,
-        ylab="%C",xlab="sample")#change trait of interest here
-
-#*how well it belongs to module
-#Gene relationship to trait and important modules: Gene Significance and Module membership
-allkME =as.data.frame(signedKME(t(dat), MEs))
-head(allkME)
-vsd=read.csv(file="rlog_MMmidnightblue.csv", row.names=1)
-head(vsd)
-library(pheatmap)
-
-############################################
-#Top 100 heat map
-whichModule="midnightblue" #*color change
-top=100
-datME=MEs
-vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
-head(vsd)
-datExpr=t(vsd)
-modcol=paste("kME",whichModule,sep="")
-head(vsd)
-sorted=vsd[order(allkME[,modcol],decreasing=T),]
-hubs=sorted[1:top,]
-# attaching gene names
-summary(hubs)
-
-contrasting = colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
-#quartz()
-setwd("/project/bi594/Pine_invasion/Figures/")
-png(file="pheatmap_midnightblue.png", width=1000, height=1500)
-pheatmap(hubs,scale="row",col=contrasting,border_color=NA, main=paste(whichModule,"kME",sep=""))
-dev.off()
-setwd("/project/bi594/Pine_invasion/")
-
-# #*labelling row names with the gene names from gg, and can see how many are significantly differentially expressed
-# gnames=c();counts=0
-# for(i in 1:length(hubs[,1])) {
-#   if (row.names(hubs)[i] %in% gg$V1) { 
-#     counts=counts+1
-#     gn=gg[gg$V1==row.names(hubs)[i],2]
-#     if (gn %in% gnames) {
-#       gn=paste(gn,counts,sep=".")
-#     }
-#     gnames=append(gnames,gn) 
-#   } else { 
-#     gnames=append(gnames,i)
-#   }
-# } 
-# row.names(hubs)=gnames
-# length(hubs)
-
-
+#####################KNOW WHICH GENERA ARE IN WHICH MODULE###############
 ###fisher for GO
 ##########fisher of module vs whole dataset
 #*fisher is binary value of 1  or 0, (1 if in module or 0 if its not)
-#*if we wanna do fisher, ask for the modified code bc something is wrong with this (bc sum is not same number in module)
 #*kME is how well that gene belongs to the module 
-
 
 #Know which genera are in a given module
 library(WGCNA)
@@ -536,6 +418,7 @@ midnightblue <- subset(inModule, module=="1")
 midnightblue <- row.names(midnightblue)
 midnightblue
 
+###################### kMEs ###################
 #*this gives kME and input for 
 #*series of how well gene belongs in module
 modColName=paste("kME",whichModule,sep="")
@@ -557,6 +440,21 @@ ggplot(data= yellowkme, aes(x=reorder(Genus, -kMEyellow), y=kMEyellow)) +
   theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
   labs(x="Genus", y="kME")
 
+#########
+#make a subset of the midnightblue kMEs for only the genera in the midnightblue module
+mbkmeinput<- paste(midnightblue, sep=",")
+midnightbluekme<- subset(modkME, rownames(modkME) %in% mbkmeinput)
+Genus <- rownames(midnightbluekme)
+rownames(midnightbluekme) <- NULL
+midnightbluekme <- cbind(Genus,midnightbluekme)
+
+#plot the kMEs to show which genera fit best into the module
+ggplot(data= midnightbluekme, aes(x=reorder(Genus, -kMEmidnightblue), y=kMEmidnightblue)) + 
+  geom_bar(fill="midnightblue", stat="identity") +
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
+  labs(x="Genus", y="kME")
+
+
 ################
 #make a subset of the grey kMEs for only the genera in the grey module
 gkmeinput<- paste(grey, sep=",")
@@ -571,19 +469,73 @@ ggplot(data= greykme, aes(x=reorder(Genus, -kMEgrey), y=kMEgrey)) +
   theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
   labs(x="Genus", y="kME")
 
-#########
-#make a subset of the midnightblue kMEs for only the genera in the midnightblue module
-mbkmeinput<- paste(midnightblue, sep=",")
-midnightbluekme<- subset(modkME, rownames(modkME) %in% mbkmeinput)
-Genus <- rownames(midnightbluekme)
-rownames(midnightbluekme) <- NULL
-midnightbluekme <- cbind(Genus,midnightbluekme)
+######################## HEATMAP OF GENERA ABUNDANCE BY SAMPLE ###################
+##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
+#names(dis)
+sizeGrWindow(8,7);
+which.module="midnightblue" #*change this also to the color of module we're looking at 
+#pick module of interest
+ME=MEs[, paste("ME",which.module, sep="")]
+genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
 
-#plot the kMEs to show which genera fit best into the module
-ggplot(data= midnightbluekme, aes(x=reorder(Genus, -kMEmidnightblue), y=kMEmidnightblue)) + 
-  geom_bar(fill="midnightblue", stat="identity") +
-  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
-  labs(x="Genus", y="kME")
+#quartz()
+# par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
+par(mfrow=c(2,1), mar=c(0.3, 5.5, 5, 2))
+plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
+par(mar=c(5, 4.2, 0, 0.7))
+barplot(ME, col=which.module, main="", cex.main=2,
+        ylab="eigengene expression",xlab="sample")
+#this is a cool plot where you can see that genes in this module are upregulated in the pH7.5 treatment
+
+###################### HEATMAP OF GENERA ABUNDANCE ORDERED BY TRAIT ##################
+##############################heatmap of module expression with bar plot of trait of interest by sample...
+#*didnt do this in class but may want to create something that ranks phenotype with gene expression (as traits increase or decrease)
+#here we just have binary traits, but if you have a continuous trait this code is cool
+sizeGrWindow(8,7);
+which.module="midnightblue" #pick module of interest
+which.trait="percC" #change trait of interest here
+datTraits=datTraits[order((datTraits$percN),decreasing=T),]#change trait of interest here
+
+trait=datTraits[, paste(which.trait)]
+genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
+genes=genes[rownames(datTraits),]
+
+#quartz()
+par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
+plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
+par(mar=c(5, 4.2, 0, 0.7))
+barplot(trait, col=which.module, main="", cex.main=2,
+        ylab="%C",xlab="sample")#change trait of interest here
+
+#*how well it belongs to module
+#Gene relationship to trait and important modules: Gene Significance and Module membership
+allkME =as.data.frame(signedKME(t(dat), MEs))
+head(allkME)
+vsd=read.csv(file="rlog_MMmidnightblue.csv", row.names=1)
+head(vsd)
+library(pheatmap)
+
+################### TOP 100 HEAT MAP #########################
+whichModule="midnightblue" #*color change
+top=100
+datME=MEs
+vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
+head(vsd)
+datExpr=t(vsd)
+modcol=paste("kME",whichModule,sep="")
+head(vsd)
+sorted=vsd[order(allkME[,modcol],decreasing=T),]
+hubs=sorted[1:top,]
+# attaching gene names
+summary(hubs)
+
+contrasting = colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+#quartz()
+setwd("/project/bi594/Pine_invasion/Figures/")
+png(file="pheatmap_midnightblue.png", width=1000, height=1500)
+pheatmap(hubs,scale="row",col=contrasting,border_color=NA, main=paste(whichModule,"kME",sep=""))
+dev.off()
+setwd("/project/bi594/Pine_invasion/")
 
 
 ######--------------------end--------------------#######
