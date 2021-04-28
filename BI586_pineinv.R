@@ -8,7 +8,6 @@
 #cat(readChar(rstudioapi::getSourceEditorContext()$path, # Writing currently opened R script to file
 #             file.info(rstudioapi::getSourceEditorContext()$path)$size))
 
-
 setwd("/project/bi594/Pine_invasion/")
 
 load(file, envir = parent.frame(), verbose = FALSE)fns <- list.files(path)
