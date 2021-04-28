@@ -32,8 +32,9 @@ library(jsonlite)
 
 #DADA2 Pipeline 
 
-Create a variable of our FASTQ files as characters 
+We start with our DADA2 analysis where we input Illumina-sequenced paired-end fastq files that have been demultiplexed by sample. We then run these files through this pipeline to create an amplicon sequence variant (ASV) table which tells us the number of times each unique sequence variant was observed in each sample.
 
+Create a variable of our FASTQ files as characters 
 ```{r}
 path <- "/project/bi594/Pine_invasion/rawdata/" #creating variable for file location
 fns <- list.files(path) #creates a character vector of FASTQ files in designated path 
@@ -331,16 +332,7 @@ Now that we've taken a look at our fungal community data, we'd like to know how 
 ########################################################################################################
 ###################Simmi
 
-#navigate into the correct directory
-setwd("/project/bi594/Pine_invasion/")
-
-library(WGCNA)
-library(flashClust)
-library(DESeq2)
-library(BiocManager)
-library(MCMC.OTU)
-
-load('Environment.4.25.21.RData')
+DATA INPUT AND CLEANING 
 
 #Merge count table with Genus IDs
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
@@ -406,12 +398,9 @@ nrow(rldFiltered)
 write.csv(rldFiltered,file="Invasion_wgcna_allgenes2.csv",quote=F,row.names=T)
 #now we have our filtered data to take into WGCNA
 
+#DATA INPUT AND CLEANING
 
-####First part of tutorial:Data input and cleaning
-library(WGCNA)
-library(flashClust)
 options(stringsAsFactors=FALSE)
-allowWGCNAThreads()
 
 dat=read.csv("Invasion_wgcna_allgenes2.csv")
 head(dat) 
@@ -427,7 +416,6 @@ datExpr0 = as.data.frame(t(dat))
 
 ### Outlier detection incorporated into trait measures. 
 #*make sure trait data is same as Expr0 and names are the same (linking things properly)
-#traitData= read.csv("Invasion_traits_WGCNA.csv", row.names=1)
 traitData= read.csv("Invasion_traits_WGCNA.csv")
 rownames(traitData)[traitData$Sample_ID=='RV55'] #insert samples removed from purgeoutliers 
 trait.trim <- traitData[-c(21),]
@@ -449,9 +437,7 @@ head(datTraits)
 head(datExpr0)
 
 #sample dendrogram and trait heat map showing outliers
-A=adjacency(t(datExpr0)) #type back to default, no direction in ITS counts
-#Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
-# this calculates the whole network connectivity we choose signed (this is the default) because we are dealing with OTU counts, not gene expression
+A=adjacency(t(datExpr0))
 k=as.numeric(apply(A,2,sum))-1 #Summing columns of adjacency matrix (-1 to account for self correlation) 
 # standardized connectivity
 Z.k=scale(k)
@@ -469,77 +455,68 @@ plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,ma
 
 save(datExpr0,datTraits, file="Invasion_Samples_Traits_ALL2.RData")
 
-#################Victoria
-######################### NETWORK CONSTRUCTION AND MODULE DETECTION ######################
-################Moving on!  Network construction and module detection - this section can take a lot of time you might consider running it on a cluster for a larger dataset
-library(WGCNA)
-library(flashClust)
+#Network Construction and Module Detection 
+
+Setting our working environment and loading in previously saved expression and trait data. 
+```{r}
 options(stringsAsFactors = FALSE)
-#enableWGCNAThreads use this in base R
-allowWGCNAThreads() 
 lnames = load(file="Invasion_Samples_Traits_ALL2.RData")
+```
 
-###################### SOFT POWER THRESHOLD #####################
-#Figure out proper SFT
-#**notes from tutorial: The function adjacency calculates the adjacency matrix from expression data.
-#*Adjacency functions for both weighted and unweighted networks require the user to choose threshold parameters, for example by applying the approximate scale-free topology criterion 
-#*general framework for soft thresholding that weighs each connection, suggested to look at scale-free topology index in WGCNA faq to decide soft threshold based on number of samples
-#*dont want to include all possible data (not be too high) bc then its overfitting wgcna model
-#*emphasizing network on stronger association/larger correlation coefficient and reduce the noise
-# Choose a set of soft-thresholding powers *****what is this?? how do we choose these powers?
-powers = c(seq(100, 190,by=10), seq(200,250, by=5))
-powers = c(seq(1, 10, by = 1), seq(12, 20, by = 2))
-; #may need to adjust these power values to hone in on proper sft value
+#Determining the soft power threshold
 
-# Choose a set of (candidate) soft-thresholding powers
-#default; Producing SFT.R.sq wayyyyy too small 
-#may need to adjust these power values to hone in on proper sft value
-#soft threshold powers are the power to which co-expression similarity is raised to calculate adjacency 
-# Call the network topology analysis function
-sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="signed", verbose = 2) #want smallest value, closest to 0.9 (but still under)
-#Printing table to help decide estimate for soft power threshold 
-#Soft power threshold chosen based on SFT.R.sq being over .8 and mean k being below the hundreds 
-#should always be less than 15 though for signed data 
+The Soft power threshold is the power to which co-expression similarity is raised in order to calculate adjacency. It is standard (according to approximate scale-free topology criterion) to select a soft power threshold that corresponds to a scale free topology model fit (R^2) greater than 0.8. If the value of SFT.R.sq does not reach this threshold within a reasonable power (less than 15 for signed data) then the soft power threshold can be decided based on sample size. 
+
 #https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
 
-#First, the user should ensure that variables (probesets, genes etc.) have not been filtered by 
-#differential expression with respect to a sample trait. (with respect to traits we have not?)
+First we must set parameters for a set of cadidate soft-threshold powers to plot and visualize scale independence and mean connectivity. 
+```{r}
+#Standard setting 
+powers = c(seq(1, 10, by = 1), seq(12, 20, by = 2))
+#Producing SFT.R.sq way too small 
 
-#If the scale-free topology fit index fails to reach values above 0.8 for reasonable powers
-#(less than 15 for signed or signed hybrid networks, and less than 30 for signed networks) 
-#and the mean connectivity remains relatively high (in the hundreds or above), 
-#chances are that the data exhibit a strong driver that makes a subset of the 
-#samples globally different from the rest. The difference causes high correlation 
-#among large groups of genes which invalidates the assumption of the scale-free topology 
-#approximation.
+#adjusting power values just to see if .8 threshold could be reached (it cannot)
+powers = c(seq(100, 190,by=10), seq(200,250, by=5))
+```
 
-#If we want to keep the variation then according to FAQ signed networks with 20-30 samples should use power threshold of 8 
+Plotting Scale Independence and Mean Connectivity to determine soft-power threshold based on the sclae free topology index and mean connectivity as functions of the soft power threshold. 
+```{r}
+# Call the network topology analysis function
+sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="signed", verbose = 2)
+```
 
-# Plot the results:
+```{r}
+#calling plot.new
 sizeGrWindow(9, 5)
 par(mfrow = c(1,2));
 cex1 = 0.9;
-# Scale-free topology fit index as a function of the soft-thresholding power
+
 plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
      xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
      main = paste("Scale independence"));
 text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
      labels=powers,cex=cex1,col="red");
-# this line corresponds to using an R^2 cut-off of h
+# this line corresponds to using an R^2 cut-off (want it to be between .8 and .9 when selecting sft)
 abline(h=0.90,col="red")
-# Mean connectivity as a function of the soft-thresholding power
+
 plot(sft$fitIndices[,1], sft$fitIndices[,5],
      xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
      main = paste("Mean connectivity"))
 text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+```
 
+Because our soft power thresholds never seem to be able to reach a signed R^2 of .8, we decide on the softpower threshold of 16 according to our sample size of 29. 
 
-#*looking at the scale dependence graph, make softPower (the soft threshold) the number that is under the 0.9 value suggested
-#*if our scale dependence graph doesnt look great than may need to look online/ask for help
+#https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
 
-softPower=16 #smallest value to plateau at ~0.85
-adjacency=adjacency(datExpr0, power=softPower,type="signed") #must change method type here too!!
-#Calculates (correlation or distance) network adjacency from given expression data or from a similarity.
+```{r}
+softPower=16 
+```
+
+Then we will construct the adjacency matrix that will be utilized to create our initial dendrogram. The adjacency function calculates (correlation or distance) network adjacency from given expression data or from similarity. We want to use signed correlation (this is the default) because we want to create modules with similar abundance patterns for easier biological interpretation of the final output. 
+```{r}
+adjacency=adjacency(datExpr0, power=softPower,type="signed") 
+```
 
 ##################Corinne
 ############################### INITIAL DENDROGRAM ##############################
@@ -876,7 +853,5 @@ setwd("/project/bi594/Pine_invasion/")
 
 
 ######--------------------end--------------------#######
-
-save.image(file='Environment.4.25.21.RData')
 
 
