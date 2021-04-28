@@ -32,7 +32,7 @@ library(jsonlite)
 
 #DADA2 Pipeline 
 
-We start with our DADA2 analysis where we input Illumina-sequenced paired-end fastq files that have been demultiplexed by sample. We then run these files through this pipeline to create an amplicon sequence variant (ASV) table which tells us the number of times each unique sequence variant was observed in each sample.
+We start with our DADA2 analysis where we input Illumina-sequenced paired-end fastq files that have been demultiplexed by sample. We then run these files through this pipeline to create an amplicon sequence variant (ASV) table which tells us the number of times each unique sequence variant was observed in each sample. We can then assign taxonomy and fungal functional groups to the ASVs to observe fungal community structure in our soil samples. 
 
 Create a variable of our FASTQ files as characters 
 ```{r}
@@ -312,7 +312,7 @@ p + geom_bar(stat="identity", colour="black") +
 
 
 ```{r}
-ggsave("Abundance.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
+ggsave("Abundance_Class.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
 
 Then we add guild annotations onto the abundance data and generate another barplot of abundance by trophic mode
@@ -320,9 +320,12 @@ Then we add guild annotations onto the abundance data and generate another barpl
 fullguild<- merge(fulldf, guilds, by="OTU")
 
 p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+ 
-  labs(x="Forest type", fill = "Class")
+  labs(x="Forest type", fill = "Trophic Mode")
 p2 + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
+```
+```{r}
+ggsave("Abundance_Trophic.png", plot=p2, path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
 
 #Weighted Gene Correlation Network Analysis
@@ -472,10 +475,13 @@ First we must set parameters for a set of cadidate soft-threshold powers to plot
 ```{r}
 #Standard setting 
 powers = c(seq(1, 10, by = 1), seq(12, 20, by = 2))
-#Producing SFT.R.sq way too small 
+#Producing SFT.R.sq way too small
+```
 
+
+```{r}
 #adjusting power values just to see if .8 threshold could be reached (it cannot)
-powers = c(seq(100, 190,by=10), seq(200,250, by=5))
+#powers = c(seq(100, 190,by=10), seq(200,250, by=5))
 ```
 
 Plotting Scale Independence and Mean Connectivity to determine soft-power threshold based on the sclae free topology index and mean connectivity as functions of the soft power threshold. 
@@ -485,11 +491,6 @@ sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="signed", ve
 ```
 
 ```{r}
-#calling plot.new
-sizeGrWindow(9, 5)
-par(mfrow = c(1,2));
-cex1 = 0.9;
-
 plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
      xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
      main = paste("Scale independence"));
@@ -497,7 +498,10 @@ text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
      labels=powers,cex=cex1,col="red");
 # this line corresponds to using an R^2 cut-off (want it to be between .8 and .9 when selecting sft)
 abline(h=0.90,col="red")
+```
 
+
+```{r}
 plot(sft$fitIndices[,1], sft$fitIndices[,5],
      xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
      main = paste("Mean connectivity"))
