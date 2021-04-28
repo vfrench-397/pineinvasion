@@ -9,7 +9,7 @@ output: html_document
 
 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 library(WGCNA)
 library(flashClust)
 library(DESeq2)
@@ -410,7 +410,6 @@ dat$X=NULL
 head(dat)
 names(dat)
 nrow(dat)
-#56
 datExpr0 = as.data.frame(t(dat))
 
 
@@ -560,71 +559,85 @@ plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= F
 
 
 ################ MERGING ##############################
-#Merge modules whose expression profiles are very similar, 
+##Merge modules
+
+Because some modules have similar genera abundance profiles, we want to merge those modules into one. With gene expression data, an eigengene is calculated for each module, which is a representative expression value for each module. We do the same here, except with abundances instead of gene expression values. 
+
+```{r}
 #calculate eigengenes
-MEList= moduleEigengenes(datExpr0, colors= dynamicColors,softPower = 16) #*will need to change this to the soft threshold decided earlier
+MEList= moduleEigengenes(datExpr0, colors= dynamicColors,softPower = 16)
 MEs= MEList$eigengenes
 #Calculate dissimilarity of module eigenegenes
 MEDiss= 1-cor(MEs)
 #Cluster module eigengenes
 METree= flashClust(as.dist(MEDiss), method= "average")
+```
 
-save(dynamicMods, MEList, MEs, MEDiss, METree, file= "Network_invasion_0.7.RData")
 
-lnames = load(file = "Network_invasion_0.7.RData")
-#plot
+
+We reload the saved data:
+```{r}
+lnames <- load(file = "Network_invasion_0.7.RData")
+```
+
+Then, we plot a tree of the modules and add a line to show where we merge the modules. Any modules below the red line will be merged to the closest branch above the line. We chose 0.7 as the merging height because any value less than 0.7 resulted in many modules with similar abundance patterns. 
+
+```{r}
 sizeGrWindow(7,6)
 plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
 
 MEDissThres= 0.7 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
+```
 
+The below code executes the actual merging of modules. We then plot the same dendrogram as previously, but with an added annotation below showing the new modules and colors after merging. 
+
+```{r}
 merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =1)
 
 mergedColors= merge$colors
 mergedMEs= merge$newMEs
 
-pdf(file="MergeNetwork0.7.pdf", width=20, height=20) 
 plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
-dev.off()
 
 moduleColors= mergedColors
-colorOrder= c("grey", standardColors(50))
+colorOrder= c("grey", standardColors(50)) #here we indicate that genera that cannot be assigned to a module are assigned the color grey 
 moduleLabels= match(moduleColors, colorOrder)-1
 MEs=mergedMEs
 
 #save module colors and labels for use in subsequent parts
 save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.7.RData")
+```
+
 
 #############################################################
-#Relating modules to traits and finding important genes #I think skip because Taxa already assigned 
-library(WGCNA)
-# The following setting is important, do not omit.
+##Relating modules to traits and finding important genes
+
+The following setting is important, do not omit:
+```{r}
 options(stringsAsFactors = FALSE);
-# Load the expression and trait data saved in the first part
-#lnames = load(file = "Network_invasion_nomerge.RData");
-#The variable lnames contains the names of loaded variables.
-#lnames
-# Load network data saved in the second part.
+```
 
-#lnames = load(file = "Network_signed_0.6.RData"); #dont load for original non-merging look 
-#lnames = load(file = "Network_invasion_nomerge.RData"); #don't load
-#lnames
-
+This code creates variables for the number of genera and the number of samples. Then we view a table of the module colors which shows how many genera are in each module.
+```{r}
 nGenes = ncol(datExpr0)
 nSamples = nrow(datExpr0)
 table(moduleColors)
-#*can pick which colors you want to further explore
+```
 
-# Recalculate MEs with color labels
+Next, we recalculate the module eigengenes with color labels. 
+```{r}
 MEs0 = moduleEigengenes(datExpr0, moduleColors)$eigengenes
 MEs = orderMEs(MEs0)
 moduleTraitCor = cor(MEs, datTraits, use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
+```
+
 
 ####################### MODULE HEATMAP #####################################
-#represent module trait correlations as a heatmap
+Now, we want to relate our modules to our traits, which are soil total C, N, and P. To do this, we represent module trait correlations as a heatmap, where each row represents a module and each column represents a trait. If a module is significant for a particular trait, it will show a low p-value (usually significance is considered p<0.05, but because of our low sample size, we will consider p<0.1 to be significant for this assignment). Significance indicates that the genera present in that module are frequently associated with either a high or low value of that trait. 
 
+```{r}
 # Will display correlations and their p-values
 textMatrix = paste(signif(moduleTraitCor, 2), "\n(",
                    signif(moduleTraitPvalue, 1), ")", sep = "");
@@ -642,14 +655,19 @@ labeledHeatmap(Matrix = moduleTraitCor,
                cex.text = 0.5,
                zlim = c(-1,1),
                main = paste("Module-trait relationships"))
+```
+This heatmap looks good, because we can tell that we did not under-merge our modules. If we had not merged our modules enough, you would see blocks of modules next to each other that have similar profiles (for example, large chunks of blue or red modules together). The top number in each cell indicates the correlation between the module and the trait, and the number in parentheses below the correlation value is the p-value showing significance of the correlation. 
 
-#*when see groups of modules that are all hot or all cold, they should be merged. this will have it more likely detect enrichment
-#* can change MEDissThres= 0.7 based on this heatmap
-#* can see tight correlations, what percentage of variation is explained by certain relationships and look for modules that are doing the same thing
+Here, we can see that the yellow module is significant for P, but negatively associated with P. In other words, genera in this module are frequently associated with low P. The midnight blue module is significant for C and N, where the genera in this module are frequently associated with high C and N. Additionally, P is positively associated with genera that could not be assigned to a module (grey). However, because of the difficulty to interpret significance of unassigned genera, we will not consider the grey module in this analysis. 
+
 
 ######################### RELATING MODULES TO TRAITS #######################
-#Gene relationship to trait and important modules:
-# Define variable weight containing the weight column of datTrait - leave weight as variable, but change names in first 2 commands
+
+Next, we quantify associations of individual genera with our traits by defining (the absolute value of) the correlation between the genus and the trait. For each module, we also define a quantitative
+measure of module membership MM as the correlation of the module eigengene and the gene expression profile. This
+allows us to quantify the similarity of all genes on the array to every module.
+
+```{r}
 weight = as.data.frame(datTraits$percC); #change Lipidrobust to your trait name
 names(weight) = "percC" 
 # names (colors) of the modules
@@ -662,6 +680,8 @@ geneTraitSignificance = as.data.frame(cor(datExpr0, weight, use = "p"));
 GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples));
 names(geneTraitSignificance) = paste("GS.", names(weight), sep="");
 names(GSPvalue) = paste("p.GS.", names(weight), sep="")
+```
+
 
 ##################### MODULE CORRELATION PLOT ####################
 #*how well things belong to module
