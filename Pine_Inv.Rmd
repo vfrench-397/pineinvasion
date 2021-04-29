@@ -286,7 +286,7 @@ p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Class))+
 p + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 ```
-
+**Figure X:** Barplot of taxa abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. From this figure we can conclude in the pine invaded forests there is an overall trend towards both a lower total abundance of taxa and a lower diversity of taxa relative to the other two forest types. 
 
 ```{r, eval = FALSE}
 ggsave("Abundance_Class.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
@@ -313,6 +313,7 @@ p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+
 p2 + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 ```
+**Figure X:** Barplot of guild abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. Functional groups seem to differ across forest types which can impact how fungi interact with soil nutrient and can impact soil nutrient condition associated with each forest type. 
 
 ```{r, eval=FALSE}
 ggsave("Abundance_Trophic.png", plot=p2, path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
@@ -853,44 +854,33 @@ In these heatmaps, we can see that the abundance of midnightblue module genera i
 
 We additionally explored the midnight blue module that was significantly positively correlated with %C, but we discounted the correlation because it appears to be driven entirely by one outlier genus. 
 
-#Figures 
-
-```{r}
-p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Class))+ 
-  labs(x="Forest type", fill = "Class")
-p + geom_bar(stat="identity", colour="black") +
-  scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
-```
-Figure 1: Barplot of taxa abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. From this figure we can conclude in the pine invaded forests there is an overall trend towards both a lower total abundance of taxa and a lower diversity of taxa relative to the other two forest types. 
-
-```{r}
-p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+ 
-  labs(x="Forest type", fill = "Trophic Mode")
-p2 + geom_bar(stat="identity", colour="black") +
-  scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
-```
-Figure 2: Barplot of guild abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. Functional groups seem to differ across forest types which can impact how fungi interact with soil nutrient and can impact soil nutrient condition associated with each forest type. 
-
-```{r}
-plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
-```
-
-```{r}
-labeledHeatmap(Matrix = moduleTraitCor,
-               xLabels = names(datTraits),
-               yLabels = names(MEs),
-               ySymbols = names(MEs),
-               colorLabels = FALSE,
-               colors = blueWhiteRed(50),
-               textMatrix = textMatrix,
-               setStdMargins = FALSE,
-               cex.text = 0.5,
-               zlim = c(-1,1),
-               main = paste("Module-trait relationships"))
-```
 
 # Conclusion
 
 In conclusion, we found that total N was positively correlated with one module of genera and total P was negatively correlated with another module of genera. With this analysis, we identified key fungal genera that are associated with high N and low P. Furthermore, abundance of the genera associated with low P varied with forest type, indicating that changes in fungal communities with pine invasion are related to changes in soil nutrients with pine invasion. 
+
+#Citations 
+
+UNITE reference Database: 
+
+Abarenkov, Kessy; Zirk, Allan; Piirmann, Timo; Pöhönen, Raivo; Ivanov, Filipp; Nilsson, R. Henrik; Kõljalg, Urmas (2020): UNITE general FASTA release for Fungi. UNITE Community. 10.15156/BIO/786368
+
+Fungal Guild Database: 
+
+```{r}
+bibentry(bibtype="article",
+            title="FUNGuild: an open annotation tool for parsing fungal community datasets by ecological guild",
+            author=c("Nhu H Nguyen", "Zewei Song", "Scott T Bates",
+                     "Sara Branco", "Leho Tedersoo", "Jon Menke",
+                     "Jonathan S Schilling", "Peter G Kennedy"),
+            journal="Fungal Ecology",
+            volume="20",
+            pages="241--248",
+            year="2016",
+            publisher="Elsevier",
+         textVersion = "Nguyen NH, Song Z, Bates ST, Branco S, Tedersoo L, Menke J, Schilling JS, Kennedy PG. 2016. FUNGuild: An open annotation tool for parsing fungal community datasets by ecological guild. Fungal Ecology 20:241–248."
+         )
+```
+
 
 
