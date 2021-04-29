@@ -10,6 +10,8 @@ output: html_document
 
 
 ```{r, warning=FALSE, message=FALSE}
+setwd("/project/bi594/Pine_invasion")
+
 library(WGCNA)
 library(flashClust)
 library(DESeq2)
@@ -230,6 +232,7 @@ saveRDS(taxa, file="final_taxa_blastCorrected.rds")
 
 Loading in the previously saved data files and the variable table for phyloseq
 ```{r}
+setwd("/project/bi594/Pine_invasion")
 seqtab.nochim <- readRDS("final_seqtab_nochim.rds")
 taxa <- readRDS("final_taxa_blastCorrected.rds")
 samdf<-read.csv("variabletable_pi.csv", header = TRUE, sep = ',')
@@ -335,75 +338,86 @@ Now that we've taken a look at our fungal community data, we'd like to know how 
 ########################################################################################################
 ###################Simmi
 
-DATA INPUT AND CLEANING 
-
-#Merge count table with Genus IDs
+Merging count data with Genus IDs and removing outlier samples. OTU cutoff was set really low so that most of the OTUs weren't purged.  
+```{r}
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
 
 count.trim <- purgeOutliers(countData,count.columns=2:282, otu.cut= .000000000001)
-#count.trim <- purgeOutliers(countData,count.columns=2:282)
-#Trimmed RV55 sample and a little under 230 taxa; adjust the arguments here; losing too many? too few? 
+```
+
+Trimmed RV55 sample and a little under 230 taxa
+```{r}
 rownames(count.trim)=count.trim$cdat
 count.trim$cdat <- NULL
 class(count.trim)
+```
 
+Transposing data.frame into a matrix and changing column names for the three sites: Plantation, Invaded forest, and Native forest.  
+```{r}
 t<- t(as.data.frame(lapply(count.trim,as.numeric)))
 colnames(t) <- rownames(count.trim)
-class(t) #t transposes data.frame into a matrix 
+class(t)
+
 sapply(t, is.numeric)
 ncol(t)
 nrow(t)
 colnames(t) = c("PL1.1", "PL1.2", "PL1.3", "PL1.4", "PL1.5", "UN1.1", "UN1.2", "UN1.3","UN1.4","UN1.5", "INV1.1", "INV1.2", "INV1.3", "INV1.4", "PL2.1", "PL2.2", "PL2.3", "PL2.4", "PL2.5", "UN2.1", "UN2.3", "UN2.4", "UN2.5", "INV2.1", "INV2.2", "INV2.3", "INV2.4", "INV2.5")
+```
 
-#Read in treatment data
+Reading in treatment data and inserting samples from purge outliers. 
+```{r}
 samdf<- read.csv("variabletable_pi.csv")
-rownames(samdf)[samdf$SampleID=='RV55'] #insert samples removed from purgeoutliers 
+rownames(samdf)[samdf$SampleID=='RV55'] 
 samdf.trim <- samdf[-c(21),]
 treat=samdf.trim$site_code
 g=data.frame(treat)
 g
-colData<- g #create coldata for DESeq , **dont really need to do if running blind=TRUE
+```
 
+Creating colData for DESeq.
+```{r}
+colData<- g
 class(colData)
 str(colData)
 nrow(colData)
+```
 
+Running DeSeq to filter out very low counts
 
-#**running deseq to filter super low counts**
+Constructing DESeqDataSet Object. 
+```{r}
 dds<-DESeqDataSetFromMatrix(countData=t, colData=colData, design=~ treat) 
+```
 
-#diagdds = phyloseq_to_deseq2(ps.rarefied, ~ site + position)
+Calculating geometric means of the counts. Estimating size factors to get the relative library depth of the samples and running DESeq function. 
+```{r}
 gm_mean = function(x, na.rm=TRUE){
   exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
 }
 geoMeans = apply(counts(dds), 1, gm_mean)
 dds = estimateSizeFactors(dds, geoMeans = geoMeans)
 dds = DESeq(dds, fitType="local")
+```
 
- 
-#Not filtering by base mean before rlog transforing the data because basemean filter formatted for gene counts, not OTU abundance data. Filtering previously with purgeOutliers function. 
-
-# get rlog data (better transformation when size factors vary across samples)
+Transform the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts. This normalizes with respect to library size. Also making a matrix of our rlog data. 
+```{r}
 rld <- rlogTransformation(dds, blind=TRUE, fitType="local")
-#**should be blind=TRUE ? the benefit of wgcna is that it has no idea what our model was so normalize with this function**
-#This function transforms the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size.
 head(rld)
-rld_wg=(assay(rld)) #Making matrix of rlogTransformation data 
+rld_wg=(assay(rld))
 head(rld_wg)
 nrow(rld_wg)
-#281
-rldFiltered=(assay(rld))[(rownames((assay(rld))) %in% rownames(dds)),]
-nrow(rldFiltered)
-#*filter by the ones removed from res3 function, to get rid of ones without the base mean, do we still do this if we didnt filter
-#281
+```
 
-write.csv(rldFiltered,file="Invasion_wgcna_allgenes2.csv",quote=F,row.names=T)
-#now we have our filtered data to take into WGCNA
+Writing csv for transformed data to take into WGCNA. 
+```{r, eval= FALSE}
+write.csv(rld_wg,file="Invasion_wgcna_allgenes2.csv",quote=F,row.names=T)
+```
 
-#DATA INPUT AND CLEANING
-
+Data input and cleaning. Transposing the expression data for further analysis.
+```{r}
 options(stringsAsFactors=FALSE)
+allowWGCNAThreads()
 
 dat=read.csv("Invasion_wgcna_allgenes2.csv")
 head(dat) 
@@ -413,50 +427,56 @@ dat$X=NULL
 head(dat)
 names(dat)
 nrow(dat)
+
 datExpr0 = as.data.frame(t(dat))
+```
 
-
-### Outlier detection incorporated into trait measures. 
-#*make sure trait data is same as Expr0 and names are the same (linking things properly)
+Reading in trait data and matching the samples to the expression samples for which they were measured (linking things correctly). Also, inserting samples removed from purgeoutliers 
+```{r}
 traitData= read.csv("Invasion_traits_WGCNA.csv")
-rownames(traitData)[traitData$Sample_ID=='RV55'] #insert samples removed from purgeoutliers 
+rownames(traitData)[traitData$Sample_ID=='RV55'] 
 trait.trim <- traitData[-c(21),]
 rownames(trait.trim) <- trait.trim$Sample_ID
 trait.trim$Sample_ID <- NULL
 dim(trait.trim)
 head(trait.trim)
 names(trait.trim)
+```
 
-# Form a data frame analogous to expression data that will hold the clinical traits.
+Creating a data frame analogous to expression data that will hold the clinical traits. 
+```{r}
 dim(datExpr0)
 rownames(datExpr0)
-# datTraits=allTraits
 datTraits=trait.trim
 row.names(datTraits)= c("PL1.1", "PL1.2", "PL1.3", "PL1.4", "PL1.5", "UN1.1", "UN1.2", "UN1.3","UN1.4","UN1.5", "INV1.1", "INV1.2", "INV1.3", "INV1.4", "PL2.1", "PL2.2", "PL2.3", "PL2.4", "PL2.5", "UN2.1", "UN2.3", "UN2.4", "UN2.5", "INV2.1", "INV2.2", "INV2.3", "INV2.4", "INV2.5")
+```
 
-table(rownames(datTraits)==rownames(datExpr0)) #should return TRUE if datasets align correctly, otherwise your names are out of order
+Returns true indicating dataset is aligned correctly.
+```{r}
+table(rownames(datTraits)==rownames(datExpr0))
 head(datTraits)
 head(datExpr0)
+```
 
-#sample dendrogram and trait heat map showing outliers
+Clustering the samples by expression to create a sample dendogram and trait heatmap. First whole network connectivity was calculated and standardized. Z.k threshold was set at -2.5 which is common. Trait colors converted such that red illustrates high values.
+```{r}
 A=adjacency(t(datExpr0))
-k=as.numeric(apply(A,2,sum))-1 #Summing columns of adjacency matrix (-1 to account for self correlation) 
-# standardized connectivity
+
+k=as.numeric(apply(A,2,sum))-1
 Z.k=scale(k)
-thresholdZ.k=-2.5 # often -2.5
+thresholdZ.k=-2.5
 outlierColor=ifelse(Z.k<thresholdZ.k,"red","black")
-sampleTree = flashClust(as.dist(1-A), method = "average") #**** why did you change from default ("complete")?
-# Convert traits to a color representation where red indicates high values
+
+sampleTree = flashClust(as.dist(1-A), method = "average")
+
 traitColors=data.frame(numbers2colors(datTraits,signed=FALSE))
 dimnames(traitColors)[[2]]=paste(names(datTraits))
 datColors=data.frame(outlierC=outlierColor,traitColors)
-# Plot the sample dendrogram and the colors underneath.
+```
+
+```{r message=FALSE, warning=FALSE, fig.cap= "**Figure X. Sample dendogram and trait heat map where red indicates high values. The first band is of outlier Carbon, there were no outliers. The following three bands depict percent nitrogen, percent carbon, and phosphorus respectively.**"}
 plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,main="Sample dendrogram and trait heatmap")
-#no outliers 
-
-
-save(datExpr0,datTraits, file="Invasion_Samples_Traits_ALL2.RData")
-
+```
 #Network Construction and Module Detection 
 
 Setting our working environment and loading in previously saved expression and trait data. 
@@ -581,6 +601,7 @@ METree= flashClust(as.dist(MEDiss), method= "average")
 
 We reload the saved data:
 ```{r}
+setwd("/project/bi594/Pine_invasion")
 lnames <- load(file = "Network_invasion_0.7.RData")
 ```
 
@@ -664,16 +685,11 @@ This heatmap looks good, because we can tell that we did not under-merge our mod
 
 Here, we can see that the yellow module is significant for P, but negatively associated with P. In other words, genera in this module are frequently associated with low P. The midnight blue module is significant for C and N, where the genera in this module are frequently associated with high C and N. Additionally, P is positively associated with genera that could not be assigned to a module (grey). However, because of the difficulty to interpret significance of unassigned genera, we will not consider the grey module in this analysis. 
 
-
-######################### RELATING MODULES TO TRAITS #######################
-
-Next, we quantify associations of individual genera with our traits by defining (the absolute value of) the correlation between the genus and the trait. For each module, we also define a quantitative
-measure of module membership MM as the correlation of the module eigengene and the gene expression profile. This
-allows us to quantify the similarity of all genes on the array to every module.
+Next, we quantify associations of individual genera with our traits by defining (the absolute value of) the correlation between the genus and the trait. For each module, we also define module membership (MM), which is a measure of the correlation of the module eigengene and the genera abundance profile. The similarity of every genera to every module is quantified.
 
 ```{r}
-weight = as.data.frame(datTraits$percC); #change Lipidrobust to your trait name
-names(weight) = "percC" 
+weight = as.data.frame(datTraits$P); #Here, you can change to your trait of interest. We use soil P here.
+names(weight) = "bulk P" 
 # names (colors) of the modules
 modNames = substring(names(MEs), 3)
 geneModuleMembership = as.data.frame(cor(datExpr0, MEs, use = "p"));
@@ -688,10 +704,11 @@ names(GSPvalue) = paste("p.GS.", names(weight), sep="")
 
 
 ##################### MODULE CORRELATION PLOT ####################
-#*how well things belong to module
-#Gene-trait significance correlation plots
-# par(mfrow=c(2,3))
-module = "midnightblue" #*change this to the module we're going to look at
+
+To examine the correlation of the genera in a module to the trait of interest, we create a correlation plot with a module of interest on the x axis and the trait on the y axis. Here, we chose the yellow module with bulk P because the yellow module was significant for bulk P on our module heatmap. We can see in this plot that there is a positive correlation between the module and bulk P. 
+
+```{r}
+module = "yellow" #*change this to the module we're going to look at
 column = match(module, modNames);
 moduleGenes = moduleColors==module;
 sizeGrWindow(7, 7);
@@ -699,23 +716,27 @@ par(mfrow = c(1,1));
 verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    abs(geneTraitSignificance[moduleGenes, 1]),
                    xlab = paste("ModMem in", module, "module"),
-                   ylab = "Gene Sig for %C",
+                   ylab = "Sig for bulk P",
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+```
+
 
 ########################## VSD FILES BY MODULE ###################### 
-#Making VSD files by module - so we can tell what genera are in each module
-vs=t(datExpr0)
-cands=names(datExpr0[moduleColors=="midnightblue"]) #*change this also to the color of module we're looking at
-#black  blue brown green  grey  pink   red
+Making VSD files by module - so we can tell what genera are in each module
 
-#*subsetting the genes in this module
-c.vsd=vs[rownames(vs) %in% cands,]
-head(c.vsd)
-nrow(c.vsd) #should correspond to module size
-table(moduleColors) #check module sizes here
-head(c.vsd)
-write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
+```{r}
+# vs=t(datExpr0)
+# cands=names(datExpr0[moduleColors=="yellow"]) #change this to the color of the module we're looking at
+# #subsetting the genes in this module
+# c.vsd=vs[rownames(vs) %in% cands,]
+# head(c.vsd)
+# nrow(c.vsd) #should correspond to module size
+# table(moduleColors) #check module sizes here
+# head(c.vsd)
+# write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
+```
+
 
 #####################KNOW WHICH GENERA ARE IN WHICH MODULE###############
 ###fisher for GO
@@ -724,33 +745,41 @@ write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
 #*kME is how well that gene belongs to the module 
 
 #Know which genera are in a given module
-library(WGCNA)
-vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
+
+We now want to know which genera fit best into our module out of all the genera in the module. To do this, we calculate a kME score for all genera, which indicates how well each genus fits into each module. A higher kME indicates a better fit in the module. 
+```{r}
+setwd("/project/bi594/Pine_invasion/")
+vsd <- read.csv("Invasion_wgcna_allgenes2.csv", row.names=1)
 head(vsd)
 options(stringsAsFactors=FALSE)
 data=t(vsd)
 allkME =as.data.frame(signedKME(data, MEs))
 
-whichModule="midnightblue" #*name your color and execute to the end
+```
+
+Then, we have to subset the genera in our module of interest from all of the genera. To do this, we first create a data frame for our module that lists all the genera and scores them as either belonging in the module ("1") or not belonging in the module ("0"). 
+
+```{r}
+whichModule="yellow"
 
 length(moduleColors)
 inModule=data.frame("module"=rep(0,nrow(vsd)))
 row.names(inModule)=row.names(vsd)
 genes=row.names(vsd)[moduleColors == whichModule]
 inModule[genes,1]=1
-sum(inModule[,1])
-head(inModule)
-write.csv(inModule,file=paste(whichModule,"_fisher.csv",sep=""),quote=F)
-#*sum is sanity check, should be the same number that was in the module
+sum(inModule[,1]) #this should be the same number of genera that was in the module
+```
 
-#know which genera are in each module
+```{r, eval=FALSE}
+write.csv(inModule,file=paste(whichModule,"_fisher.csv",sep=""),quote=F)
+```
+
+Now, we can extract a list of the genera in the module. 
+```{r}
 yellow <- subset(inModule, module=="1")
 yellow <- row.names(yellow)
 yellow
-
-grey <- subset(inModule, module=="1")
-grey <- row.names(grey)
-grey
+```
 
 midnightblue <- subset(inModule, module=="1")
 midnightblue <- row.names(midnightblue)
@@ -759,53 +788,34 @@ midnightblue
 ###################### kMEs ###################
 #*this gives kME and input for 
 #*series of how well gene belongs in module
+We then create a dataframe of the kMEs of all the genera for just our module of interest: 
+```{r}
 modColName=paste("kME",whichModule,sep="")
 modkME=as.data.frame(allkME[,modColName])
 row.names(modkME)=row.names(allkME)
 names(modkME)=modColName
 write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
+```
 
-#make a subset of the yellow kMEs for only the genera in the yellow module
+From this dataframe, we then subset just the genera in our module of interest:
+```{r}
 ykmeinput<- paste(yellow, sep=",")
 yellowkme<- subset(modkME, rownames(modkME) %in% ykmeinput)
 Genus <- rownames(yellowkme)
 rownames(yellowkme) <- NULL
 yellowkme <- cbind(Genus,yellowkme)
+```
 
-#plot the kMEs to show which genera fit best into the module
+And now, we can plot the kMEs of the genera in our module of interest to see which genera fit best into the module. 
+```{r}
 ggplot(data= yellowkme, aes(x=reorder(Genus, -kMEyellow), y=kMEyellow)) + 
   geom_bar(color= "black", fill="yellow", stat="identity") +
   theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
   labs(x="Genus", y="kME")
+```
 
-#########
-#make a subset of the midnightblue kMEs for only the genera in the midnightblue module
-mbkmeinput<- paste(midnightblue, sep=",")
-midnightbluekme<- subset(modkME, rownames(modkME) %in% mbkmeinput)
-Genus <- rownames(midnightbluekme)
-rownames(midnightbluekme) <- NULL
-midnightbluekme <- cbind(Genus,midnightbluekme)
+We can conclude here that these genera are associated with low soil P, and may be drivers of low soil P. The genera with the highest kMEs may be key genera that are driving low soil P: *Meliniomyces*, *Leucosporidium*, and *Densospora*. 
 
-#plot the kMEs to show which genera fit best into the module
-ggplot(data= midnightbluekme, aes(x=reorder(Genus, -kMEmidnightblue), y=kMEmidnightblue)) + 
-  geom_bar(fill="midnightblue", stat="identity") +
-  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
-  labs(x="Genus", y="kME")
-
-
-################
-#make a subset of the grey kMEs for only the genera in the grey module
-gkmeinput<- paste(grey, sep=",")
-greykme<- subset(modkME, rownames(modkME) %in% gkmeinput)
-Genus <- rownames(greykme)
-rownames(greykme) <- NULL
-greykme <- cbind(Genus,greykme)
-
-#plot the kMEs to show which genera fit best into the module
-ggplot(data= greykme, aes(x=reorder(Genus, -kMEgrey), y=kMEgrey)) + 
-  geom_bar(fill="grey", stat="identity") +
-  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
-  labs(x="Genus", y="kME")
 
 ######################## HEATMAP OF GENERA ABUNDANCE BY SAMPLE ###################
 ##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
