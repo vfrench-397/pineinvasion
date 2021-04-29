@@ -1,7 +1,9 @@
 ---
-title: "Pine_Invasion"
+title: "Fungal communities are linked to soil nutrient conditions in pine invasions"
 output: html_document
 ---
+### Corinne Vietorisz, Victoria French, and Simmi Nishad
+
 
 # Introduction 
 
@@ -27,6 +29,10 @@ datastorr 0.0.3
 fungaltraits 0.0.3
 FUNGuildR 0.2.0.9000
 jsonlite 1.7.2
+
+# Data and sample sources
+We'd like to thank Dr. Alejandro Rojas at the University of Arkansas for providing us with the genomic fungal ITS sequence data, and Dr. Rytas Vilgalys from Duke University for collecting the soil samples. Soil was processed by Corinne Vietorisz and Patrycia Glowiak at Boston University for soil C, N, and P. 
+
 
 ```{r, warning=FALSE, message=FALSE}
 setwd("/project/bi594/Pine_invasion")
@@ -133,6 +139,7 @@ Sanity check: We want to visualize error rates and make sure they are following 
 plotErrors(errF, nominalQ=TRUE)
 plotErrors(errR, nominalQ=TRUE)
 ```
+
 Our error rates look relatively okay, not strictly linear but definitely a negative correlation 
 
 ## Dereplicating Reads 
@@ -280,13 +287,14 @@ fulldf90 <- merge(psz90, samdf, by="SampleID")
 ```
 
 Generating the barplot of fungal abundance by forest type separated by Class
-```{r, fig.width=12}
+```{r, fig.width=10}
 p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Class))+ 
   labs(x="Forest type", fill = "Class")
 p + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 ```
-**Figure X:** Barplot of taxa abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. From this figure we can conclude in the pine invaded forests there is an overall trend towards both a lower total abundance of taxa and a lower diversity of taxa relative to the other two forest types. 
+
+**Figure 1. Barplot of taxa abundance by forest type.** The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. From this figure we can conclude in the pine invaded forests there is an overall trend towards both a lower total abundance of taxa and a lower diversity of taxa relative to the other two forest types. 
 
 ```{r, eval = FALSE}
 ggsave("Abundance_Class.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
@@ -313,13 +321,15 @@ p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+
 p2 + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 ```
-**Figure X:** Barplot of guild abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. Functional groups seem to differ across forest types which can impact how fungi interact with soil nutrient and can impact soil nutrient condition associated with each forest type. 
+
+**Figure 2. Barplot of guild abundance by forest type.** The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. Functional groups seem to differ across forest types which can impact soil nutrients across forest types.
+
+It is important that abundances of functional groups differ across forest types because a taxa's functional group can indicate its role in soil C and nutrient cycling. For example, saprotrophs are usually implicated in C cycling, while mycorrhizal fungi ("symbiotrophs") are usually implicated in N and P cycling.
 
 ```{r, eval=FALSE}
 ggsave("Abundance_Trophic.png", plot=p2, path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
 
-Here, we can see that the abundance of different functional guilds is different between forest types, which could have large impacts on nutrient cycling.
 
 Collapsing taxonomy in OTU table for WGCNA input 
 ```{r}
@@ -473,9 +483,10 @@ dimnames(traitColors)[[2]]=paste(names(datTraits))
 datColors=data.frame(outlierC=outlierColor,traitColors)
 ```
 
-```{r message=FALSE, warning=FALSE, fig.cap= "**Figure X. Sample dendogram and trait heat map where red indicates high values. The first band indicates that there were no outliers. The following three bands depict soil percent nitrogen, percent carbon, and bulk phosphorus respectively.**"}
+```{r message=FALSE, warning=FALSE, fig.cap= "**Figure 3. Sample dendogram and trait heat map.** Red indicates high values. The first band indicates that there were no outliers. The following three bands depict soil percent nitrogen, percent carbon, and bulk phosphorus respectively."}
 plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,main="Sample dendrogram and trait heatmap")
 ```
+
 ## Network Construction and Module Detection 
 
 Setting our working environment and loading in previously saved expression and trait data. 
@@ -572,7 +583,8 @@ Next, we assign colors to each module and plot the colors below the dendrogram t
 dynamicColors= labels2colors(dynamicMods) #assigning colors to each module
 plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang= 0.05, main= "Dendrogram and module colors")
 ```
-**Figure X. Dendrogram and module colors.** Each leaf of the tree corresponds to a genus, and branches grouping together densely are genera that frequently occur together. The colors on the Dynamic Tree Cut band correspond to the module groupings of genera. No modules have been merged. 
+
+**Figure 4. Dendrogram and module colors.** Each leaf of the tree corresponds to a genus, and branches grouping together densely are genera that frequently occur together. The colors on the Dynamic Tree Cut band correspond to the module groupings of genera. No modules have been merged. 
 
 ## Merge modules
 
@@ -603,7 +615,8 @@ plot(METree, main= "Clustering of module eigen abundances", xlab= "", sub= "")
 MEDissThres= 0.7 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
 ```
-**Figure X. Tree clustering of module eigen abundances based on similarity.** Each branch of the tree represents a module. The red line shows the height at which we merged modules, which was 0.7.
+
+**Figure 5. Tree clustering of module eigen abundances based on similarity.** Each branch of the tree represents a module. The red line shows the height at which we merged modules, which was 0.7.
 
 The below code executes the actual merging of modules. We then plot the same dendrogram as previously, but with an added annotation below showing the new modules and colors after merging. 
 
@@ -615,6 +628,11 @@ mergedMEs= merge$newMEs
 
 plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
 
+```
+
+**Figure 6. Dendrogram and module colors post-merging.** Each leaf of the tree corresponds to a genus, and branches grouping together densely are genera that frequently occur together. The colors on the Dynamic Tree Cut band correspond to the module groupings of genera without mergin. The colors on the Merged dynamic band correspond to the module groupings after merging at a height of 0.7.
+
+```{r, messages=FALSE}
 moduleColors= mergedColors
 colorOrder= c("grey", standardColors(50)) #here we indicate that genera that cannot be assigned to a module are assigned the color grey 
 moduleLabels= match(moduleColors, colorOrder)-1
@@ -623,6 +641,7 @@ MEs=mergedMEs
 #save module colors and labels for use in subsequent parts
 save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.7.RData")
 ```
+
 
 ## Relating modules to traits and finding important genes
 
@@ -668,7 +687,8 @@ labeledHeatmap(Matrix = moduleTraitCor,
                zlim = c(-1,1),
                main = paste("Module-trait relationships"))
 ```
-**Figure X. Heatmap of module-trait relationships.** Each row represents a module and each column represents a trait. Red cells indicate that the genera in that module are positively associated with the trait, and blue cells indicate that the genera in that module are negatively associated with the trait. The top number in each cell indicates the correlation between the module and the trait, and the number in parentheses below the correlation value is the p-value showing significance of the correlation. Significance indicates that the genera present in that module are frequently associated with either a high or low value of that trait. 
+
+**Figure 7. Heatmap of module-trait relationships.** Each row represents a module and each column represents a trait. Red cells indicate that the genera in that module are positively associated with the trait, and blue cells indicate that the genera in that module are negatively associated with the trait. The top number in each cell indicates the correlation between the module and the trait, and the number in parentheses below the correlation value is the p-value showing significance of the correlation. Significance indicates that the genera present in that module are frequently associated with either a high or low value of that trait. 
 
 This heatmap looks good, because we can tell that we did not under-merge our modules. If we had not merged our modules enough, you would see blocks of modules next to each other that have similar profiles (for example, large chunks of blue or red modules together). 
 
@@ -707,7 +727,8 @@ verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 ```
-**Figure X. Scatterplot of genera significance for bulk P vs. genera module membership in the yellow module.** Each point represents one genus in the module. Module membership in the yellow module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. "cor" is the correlation value, and "p" indicates the significance of the correlation. 
+
+**Figure 8. Scatterplot of genera significance for bulk P vs. genera module membership in the yellow module.** Each point represents one genus in the module. Module membership in the yellow module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. "cor" is the correlation value, and "p" indicates the significance of the correlation. 
 
 ### Identify genera in each module and their kMEs
 
@@ -776,7 +797,7 @@ ggplot(data= yellowkme, aes(x=reorder(Genus, -kMEyellow), y=kMEyellow)) +
   labs(x="Genus", y="kME")
 ```
 
-**Figure X. Barplot of genera in the yellow module vs. their kMEs for the module.** Increasing kME indicates that the genus fits better into the module.
+**Figure 9. Barplot of genera in the yellow module vs. their kMEs for the module.** Increasing kME indicates that the genus fits better into the module.
 
 We can conclude here that these genera are associated with low soil P, and may be drivers of low soil P. The genera with the highest kMEs may be key genera that are driving low soil P: *Meliniomyces*, *Leucosporidium*, and *Densospora*. 
 
@@ -797,7 +818,8 @@ par(mar=c(5, 4.2, 0, 0.7))
 barplot(ME, col=which.module, main="", cex.main=2,
         ylab="Eigengene abundances",xlab="sample")
 ```
-**Figure X. Heatmap of genera abundances in each sample in the yellow module and eigengene abundance barplot.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Higher bars in the barplot indicate higher abundances of genera in the yellow module in a given sample. 'PL' samples are from pine plantations, 'UN' samples are from uninvaded eucalypt forests adjacent to invaded forests, and 'INV' are from pine-invaded eucalypt forests.
+
+**Figure 10. Heatmap of genera abundances in each sample in the yellow module and eigengene abundance barplot.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Higher bars in the barplot indicate higher abundances of genera in the yellow module in a given sample. 'PL' samples are from pine plantations, 'UN' samples are from uninvaded eucalypt forests adjacent to invaded forests, and 'INV' are from pine-invaded eucalypt forests.
 
 
 While sample UN2.3 has much higher abundances of genera in the yellow module than all other samples, all samples from the invaded forest in site 2 have relatively high abundances of genera in the yellow module. This indicates that abundance of genera associated with low P varies across forest types.
@@ -819,21 +841,22 @@ par(mar=c(5, 4.2, 0, 0.7))
 barplot(trait, col=which.module, main="", cex.main=2,
         ylab="bulk P (ug/g)",xlab="sample")#change trait of interest here
 ```
-**Figure X. Heatmap of genera abundances in each sample in the yellow module and barplot of bulk soil P.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more bulk P in a soil sample. "PL" samples are from pine plantations, "UN" samples are from uninvaded eucalypt forests adjacent to invaded forests, and "INV" are from pine-invaded eucalypt forests.
+
+**Figure 11. Heatmap of genera abundances in each sample in the yellow module and barplot of bulk soil P.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more bulk P in a soil sample. "PL" samples are from pine plantations, "UN" samples are from uninvaded eucalypt forests adjacent to invaded forests, and "INV" are from pine-invaded eucalypt forests.
 
 In this figure, we can see that samples with lower bulk P also have higher abundances of genera in the yellow module, confirming the correlation between the yellow module and lower soil P. 
 
 ### Exploring other significant modules
 Now, to explore the other significant module, midnightblue, we do the same steps that we did with the yellow module but with %N as the trait of interest. We first created a scatter plot of genera significance for %N against the module membership in the midnightblue module. We can see in this plot that there is a positive correlation between the module and %N, so the module is indeed significant. 
 
-```{r echo=FALSE, fig.cap="**Figure X. Scatterplot of genera significance for %N vs. genera module membership in the midnightblue module.** Each point represents one genus in the module. Module membership in the midnightblue module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. cor is the correlation value, and p indicates the significance of the correlation."}
-knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/scatterplot_midnightblue.png'))
+```{r echo=FALSE, out.width="100%", out.height="100%", fig.cap="**Figure 12. Scatterplot of genera significance for %N vs. genera module membership in the midnightblue module.** Each point represents one genus in the module. Module membership in the midnightblue module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. cor is the correlation value, and p indicates the significance of the correlation."}
+knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/scatterplot_midnightblue_N.png'))
 ```
 
 The plot of kME by genera for the midnightblue module shows which genera are in the module and how well they belong. 
 
 
-```{r echo=FALSE, fig.cap="**Figure X. Barplot of genera in the midnightblue module vs. their kMEs for the module.** Increasing kME indicates that the genus fits better into the module."}
+```{r echo=FALSE, out.width="100%", out.height="100%", fig.cap="**Figure 13. Barplot of genera in the midnightblue module vs. their kMEs for the module.** Increasing kME indicates that the genus fits better into the module."}
 knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/kME_midnightblue.png'))
 ```
 
@@ -841,11 +864,11 @@ We can see here that the genera *Serendipita*, *Ophiosphaerella*, *Basidioascus*
 
 We made the same heatmaps as with the yellow module, plotting the genera abundances in each sample alongside the eigengene abundance barplot and soil %N barplot. 
 
-```{r echo=FALSE, fig.cap="**Figure X. Heatmap of genera abundances in each sample in the midnightblue module and eigengene abundance barplot.** Columns of the heatmap represent samples and rows represent each genus in the midnightblue module. Red indicates higher abundance of a genus and light green represents lower abundance. Higher bars in the barplot indicate higher abundances of genera in the midnightblue module in a given sample. PL samples are from pine plantations, UN samples are from uninvaded eucalypt forests adjacent to invaded forests, and INV are from pine-invaded eucalypt forests."}
+```{r echo=FALSE, out.width="100%", out.height="100%", fig.cap="**Figure 14. Heatmap of genera abundances in each sample in the midnightblue module and eigengene abundance barplot.** Columns of the heatmap represent samples and rows represent each genus in the midnightblue module. Red indicates higher abundance of a genus and light green represents lower abundance. Higher bars in the barplot indicate higher abundances of genera in the midnightblue module in a given sample. PL samples are from pine plantations, UN samples are from uninvaded eucalypt forests adjacent to invaded forests, and INV are from pine-invaded eucalypt forests."}
 knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/abund_heatmap_midnightblue.png'))
 ```
 
-```{r echo=FALSE, fig.cap="**Figure X. Heatmap of genera abundances in each sample in the midnightblue module and barplot of soil %N.** Columns of the heatmap represent samples and rows represent each genus in the midnightblue module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more total N in a soil sample. PL samples are from pine plantations, UN samples are from uninvaded eucalypt forests adjacent to invaded forests, and INV are from pine-invaded eucalypt forests."}
+```{r echo=FALSE, out.width="100%", out.height="100%", fig.cap="**Figure 15. Heatmap of genera abundances in each sample in the midnightblue module and barplot of soil %N.** Columns of the heatmap represent samples and rows represent each genus in the midnightblue module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more total N in a soil sample. PL samples are from pine plantations, UN samples are from uninvaded eucalypt forests adjacent to invaded forests, and INV are from pine-invaded eucalypt forests."}
 knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/trait_heatmap_midnightblue.png'))
 ```
 
@@ -854,7 +877,7 @@ In these heatmaps, we can see that the abundance of midnightblue module genera i
 
 We additionally explored the midnight blue module that was significantly positively correlated with %C, but we discounted the correlation because it appears to be driven entirely by one outlier genus. 
 
-```{r echo=FALSE, fig.cap="**Figure X. Scatterplot of genera significance for %C vs. genera module membership in the  midnightblue module.** Each point represents one genus in the module. Module membership in the midnightblue module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. cor is the correlation value, and p indicates the significance of the correlation."}
+```{r echo=FALSE, out.width="100%", out.height="100%", fig.cap="**Figure 16. Scatterplot of genera significance for %C vs. genera module membership in the  midnightblue module.** Each point represents one genus in the module. Module membership in the midnightblue module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. cor is the correlation value, and p indicates the significance of the correlation."}
 knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/scatterplot_midnightblue_C.png'))
 ```
 
@@ -870,7 +893,7 @@ UNITE reference Database:
 
 Abarenkov, Kessy; Zirk, Allan; Piirmann, Timo; Pöhönen, Raivo; Ivanov, Filipp; Nilsson, R. Henrik; Kõljalg, Urmas (2020): UNITE general FASTA release for Fungi. UNITE Community. 10.15156/BIO/786368
 
-Fungal Guild Database: 
+Funguild Database: 
 
 ```{r}
 bibentry(bibtype="article",
