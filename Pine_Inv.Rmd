@@ -10,7 +10,23 @@ Pine trees are one of the most widely invasive species in the world. Pines are p
 
 # Version Control 
 
-
+R version 4.0.3 (2020-10-10)
+WGCNA 1.70.3
+flashClust 1.1.2
+DESeq2 1.30.1
+BiocManager 1.30.12
+MCMC.OTU 1.0.10
+pheatmap 1.0.12
+dada2 1.18.0
+ShortRead 1.48.0
+ggplot2 3.3.3
+phyloseq 1.34.0
+Biostrings 2.58.0
+data.table 1.14.0
+datastorr 0.0.3
+fungaltraits 0.0.3
+FUNGuildR 0.2.0.9000
+jsonlite 1.7.2
 
 ```{r, warning=FALSE, message=FALSE}
 setwd("/project/bi594/Pine_invasion")
@@ -297,6 +313,7 @@ p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+
 p2 + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 ```
+
 ```{r, eval=FALSE}
 ggsave("Abundance_Trophic.png", plot=p2, path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
@@ -950,6 +967,41 @@ barplot(trait, col=which.module, main="", cex.main=2,
 
 We additionally explored the midnight blue module what was significantly positively correlated with %C, but we discounted the correlation because it appears to be driven entirely by one outlier genus. 
 
+#Figures 
+
+```{r}
+p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Class))+ 
+  labs(x="Forest type", fill = "Class")
+p + geom_bar(stat="identity", colour="black") +
+  scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
+```
+Figure 1: Barplot of taxa abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. From this figure we can conclude in the pine invaded forests there is an overall trend towards both a lower total abundance of taxa and a lower diversity of taxa relative to the other two forest types. 
+
+```{r}
+p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+ 
+  labs(x="Forest type", fill = "Trophic Mode")
+p2 + geom_bar(stat="identity", colour="black") +
+  scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
+```
+Figure 2: Barplot of guild abundance by forest type. The x-axis displays the categorical variables of forest type. The y-axis is total abundance of taxonomic class. Functional groups seem to differ across forest types which can impact how fungi interact with soil nutrient and can impact soil nutrient condition associated with each forest type. 
+
+```{r}
+plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
+```
+
+```{r}
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(datTraits),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+```
 
 # Conclusion
 
