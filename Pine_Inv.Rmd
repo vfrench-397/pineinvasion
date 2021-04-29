@@ -3,9 +3,12 @@ title: "Pine_Invasion"
 output: html_document
 ---
 
-#Introduction 
+# Introduction 
 
-#Version Control 
+Pine trees are one of the most widely invasive species in the world. Pines are planted for commercial forestry across the southern hemisphere, where they escape plantations and invade native vegetation, such as grasslands, shrublands, beech forests, and eucalypt forests. Pines co-invade with non-native ectomycorrhizal fungi that pave the way for invasions by dispersing beyond the plantation, thus enabling new pine seedlings to take hold beyond the plantation. However, the fungi that are able to disperse beyond the plantation are a very limited set of fungi, leading to greatly reduced mycorrhizal diversity associated with pine invasions. Pine invasions are not only associated with drastically altered fungal communities, but invasion into Australian eucalyptus forests are also associated with lower soil total nitrogen (N) and phosphorus (P), and higher soil carbon (C):N and C:P ratios. Because soil fungal communities can have large impacts on and be greatly impacted by soil nutrients, we sought to address whether unique soil fungal communities in Australian pine-invaded forests, pine plantations, and uninvaded eucalypt forests are linked to the soil nutrients in these three forest types. Here, we analyzed the fungal communities in each of these three forest types at two sites in Australia that each contained the three forest types. 5 soil samples were collected at each forest type and analyzed for total C, total N, and bulk P. In each sample, fungal DNA was extracted and the ITS region was sequenced with Illumina Miseq. We processed the DNA sequence data with the DADA2 pipeline and then linked fungal communities to soil total C, N, and P with a weighted gene correlation network analysis formatted for taxa abundance data instead of gene expression data. We found that total N was positively correlated with one module of genera and total P was negatively correlated with another module of genera. With this analysis, we identified key fungal genera that are associated with high N and low P. Furthermore, abundance of the genera associated with low P varied with forest type, indicating that changes in fungal communities with pine invasion are related to changes in soil nutrients with pine invasion. 
+
+
+# Version Control 
 
 
 
@@ -30,9 +33,8 @@ library(FUNGuildR)
 library(jsonlite)
 ```
 
-#Data Analysis 
 
-#DADA2 Pipeline 
+# DADA2 Pipeline 
 
 We start with our DADA2 analysis where we input Illumina-sequenced paired-end fastq files that have been demultiplexed by sample. We then run these files through this pipeline to create an amplicon sequence variant (ASV) table which tells us the number of times each unique sequence variant was observed in each sample. We can then assign taxonomy and fungal functional groups to the ASVs to observe fungal community structure in our soil samples. 
 
@@ -40,10 +42,9 @@ Create a variable of our FASTQ files as characters
 ```{r}
 path <- "/project/bi594/Pine_invasion/rawdata/" #creating variable for file location
 fns <- list.files(path) #creates a character vector of FASTQ files in designated path 
-fns #sanity check; make sure all files are accounted for 
 ```
 
-##Trimming and Filtering 
+## Trimming and Filtering 
 
 We create and sort the samples. We then divide them into complementary forward (_R1) and reverse (_R2) reads and simplify sample names
 ```{r}
@@ -58,27 +59,13 @@ We then specified the path to the forward and reverse fastq files
 ```{r}
 fnFs <- file.path(path, fnFs) 
 fnRs <- file.path(path, fnRs)
-fnFs
-fnRs
 ```
 
 Plotting Quality profiles to determine truncLen cutoffs for filter and trimming
 ```{r}
 plotQualityProfile(fnFs[c(1:9)])
-plotQualityProfile(fnFs[c(10:18)])
-plotQualityProfile(fnFs[c(19:27)])
-plotQualityProfile(fnFs[c(28:35)])
-plotQualityProfile(fnFs[c(36:44)])
-plotQualityProfile(fnFs[c(45:53)])
-plotQualityProfile(fnFs[c(54:59)])
-
 plotQualityProfile(fnRs[c(1:9)])
-plotQualityProfile(fnRs[c(10:18)])
-plotQualityProfile(fnRs[c(19:27)])
-plotQualityProfile(fnRs[c(28:35)])
-plotQualityProfile(fnRs[c(36:44)])
-plotQualityProfile(fnRs[c(45:53)])
-plotQualityProfile(fnRs[c(54:59)])
+
 ```
 
 Creating subdirectory and directing the filtered and trimmed sequences to the specified directory. We then applied the saved sample.names to the filtered sequences. 
@@ -116,7 +103,7 @@ head(out)
 tail(out)
 ```
 
-##Learning Error Rates 
+## Learning Error Rates 
 
 DADA2 was utilized to employ a parametric error model to determine the error rate of the amplicon dataset. We kept the standard max consistency of 30 to increase the number of cycles and allow for convergence.
 ```{r}
@@ -126,13 +113,13 @@ errR <- learnErrors(filtRs, multithread=TRUE)
 ```
 
 Sanity check: We want to visualize error rates and make sure they are following a negative correlation with quality scores
-```{r}
+```{r, message=FALSE,warning= FALSE}
 plotErrors(errF, nominalQ=TRUE)
 plotErrors(errR, nominalQ=TRUE)
-#error rates look relatively okay, not strictly linear but definitely a negative correlation 
 ```
+Our error rates look relatively okay, not strictly linear but definitely a negative correlation 
 
-##Dereplicating Reads 
+## Dereplicating Reads 
 
 Reads were dereplicated into unique sequences and deseq objects were assigned to sample names
 ```{r}
@@ -142,24 +129,23 @@ names(derepFs) <-sample.names
 names(derepRs) <-sample.names
 ```
 
-##Inferring Sequence Variants 
+## Inferring Sequence Variants 
 
 Applying the joint sample inference algorithm (infers sample sequences exactly and resolves differences of as little as 1 nucleotide) to get a the real variants as a dada class object. We set the band size to 32 as is recommended for ITS2 data. 
-```{r}
+```{r, message=FALSE,warning= FALSE, results='hide'}
 setDadaOpt(BAND_SIZE=32) 
 dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
 dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
 
 #Observing the dada class object by sample to identify number of sequence variants 
 dadaFs[[1]]
-dadaFs[[59]]
+dadaFs[[29]]
 ```
 
 Denoised forward reads were aligned with reverse-compliment corresponding denoised reverse reads to obtain full sequences
 
 ```{r}
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=FALSE)
-head(mergers[[1]])
 ```
 
 Constructing a sequence table (higher resolution otu table) The sequence table is a matrix with rows corresponding to (and named by) the samples, and columns corresponding to (and named by) the sequence variants
@@ -167,10 +153,9 @@ Constructing a sequence table (higher resolution otu table) The sequence table i
 ```{r}
 seqtab <- makeSequenceTable(mergers)
 dim(seqtab) 
-head(seqtab)
 ```
 
-##Removing Chimeras 
+## Removing Chimeras 
 
 Dada accounts for substitution and indel errors but does not remove chimeras. 
 ```{r}
@@ -179,17 +164,18 @@ seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE
 dim(seqtab.nochim)
 table(nchar(getSequences(seqtab.nochim))) #distribution of sequence lengths 
 sum(seqtab.nochim)/sum(seqtab) 
-#Chimeras account for less than 1% of merged sequence variants 
+
 ```
+Chimeras account for less than 1% of merged sequence variants 
 
 Writing the output of the original sequence table and the sequence table with chimeras removed
 
-```{r}
+```{r, eval=FALSE}
 write.csv(seqtab,file="pineinvasion_seqtab.csv")
 write.csv(seqtab.nochim,file="pineinvasion_nochim.csv")
 ```
 
-##Tracking Read Statistics
+## Tracking Read Statistics
 
 Producing a csv table output that allows us to track the read statistics throughout the pipeline. It displays the raw reads, how many reads were filtered, denoised, etc. The final number of reads is located under the nonchim column.
 ```{r}
@@ -198,47 +184,44 @@ track <- cbind(out, sapply(dadaFs, getN), sapply(dadaFs, getN), rowSums(seqtab),
 colnames(track) <- c("input", "filtered", "denoised", "merged", "tabled", "nonchim")
 rownames(track) <- sample.names 
 head(track)
-tail(track)
 ```
 
 Writing the track reads csv
-```{r}
+```{r, eval=FALSE}
 write.csv(track,file="ReadFilterStats_AllData_final.csv",row.names=TRUE,quote=FALSE)
 ```
 
-##Assigning Taxonomy 
+## Assigning Taxonomy 
 
-We assigned the taxonomy using the UNITE general release reference database for Fungi. This version was released April 2nd 2020. All arguments were kept at default. 
-```{r}
+We assigned the taxonomy using the UNITE general release reference database for Fungi (https://unite.ut.ee/repository.php). This version was released April 2nd 2020. All arguments were kept at default. 
+```{r, message=FALSE}
 taxa <- assignTaxonomy(seqtab.nochim, "/project/bi594/Pine_invasion/sh_general_release_dynamic_s_04.02.2020.fasta", multithread=TRUE)
 taxa.print <- taxa
 rownames(taxa.print) <- NULL #this gets rid of the sequence column
 
-head(taxa.print) #prints taxonomy; look like fungi
 ```
 
 Writing the taxa csv file and save reads for the downstream heatmap
-```{r}
+```{r, eval=FALSE, results= 'hide'}
 unname(head(taxa, 30))
 unname(taxa)
 taxa<- sub('...', '', taxa)
+```
+```{r, eval=FALSE}
 write.csv(taxa, file="taxa.csv",row.name=TRUE,quote=FALSE)
-
 saveRDS(seqtab.nochim, file="final_seqtab_nochim.rds")
 saveRDS(taxa, file="final_taxa_blastCorrected.rds")
 ```
 
-#Phyloseq 
+
+# Phyloseq 
 
 Loading in the previously saved data files and the variable table for phyloseq
-```{r}
+```{r, warning = FALSE, message= FALSE}
 setwd("/project/bi594/Pine_invasion")
 seqtab.nochim <- readRDS("final_seqtab_nochim.rds")
 taxa <- readRDS("final_taxa_blastCorrected.rds")
 samdf<-read.csv("variabletable_pi.csv", header = TRUE, sep = ',')
-#head and tail the variable table to ensure the same order as sequence table 
-head(samdf)
-tail(samdf)
 rownames(samdf) <- samdf$SAMPLE #making rownames the same as sample names in seq.nochim to merge in phyloseq
 ```
 
@@ -251,7 +234,7 @@ ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE),
 ps
 ```
 
-#Generating Abundance Bar plot 
+## Generating Abundance Bar plot 
 
 Selecting the Top 90 most abundant taxa
 ```{r}
@@ -263,10 +246,13 @@ ps.top90 <- prune_taxa(top90, ps.top90)
 Write a csv for the phyloseq data to hold the taxa abundances per sample. This will be useful for contructing the downstream heatmap. 
 ```{r}
 psz <- psmelt(ps)
-write.csv(psz, file="psz.csv")
 psz90 <- psmelt(ps.top90)
+```
+```{r, eval=FALSE}
+write.csv(psz, file="psz.csv")
 write.csv(psz90, file="top90.csv")
 ```
+
 
 Appending the meta-data to the phyloseq data 
 ```{r}
@@ -278,7 +264,7 @@ fulldf90 <- merge(psz90, samdf, by="SampleID")
 ```
 
 Generating the barplot of fungal abundance by forest type separated by Class
-```{r}
+```{r, fig.width=12}
 p <- ggplot(fulldf, aes(x = site_code, y=Abundance, fill=Class))+ 
   labs(x="Forest type", fill = "Class")
 p + geom_bar(stat="identity", colour="black") +
@@ -286,13 +272,13 @@ p + geom_bar(stat="identity", colour="black") +
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 ggsave("Abundance_Class.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
 
-Assigning Functional Groups 
+## Assigning Functional Groups 
 
-Assigning functional groups in Funguild and Fun^fun
+Assigning functional groups from the Funguild database (https://github.com/brendanf/FUNGuildR)
 ```{r}
 funguild_input<- data.frame(taxa)
 funguild_input$OTU <- row.names(funguild_input)  
@@ -311,9 +297,11 @@ p2 <- ggplot(fullguild, aes(x = site_code, y=Abundance, fill=trophicMode))+
 p2 + geom_bar(stat="identity", colour="black") +
   scale_x_discrete(labels=c('Invaded forest', 'Plantation', "Native forest"))
 ```
-```{r}
+```{r, eval=FALSE}
 ggsave("Abundance_Trophic.png", plot=p2, path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
+
+Here, we can see that the abundance of different functional guilds is different between forest types, which could have large impacts on nutrient cycling.
 
 Collapsing taxonomy in OTU table for WGCNA input 
 ```{r}
@@ -328,19 +316,17 @@ colnames(otu) <- Genus
 ```
 
 Write the OTU that will be used as the input for WGCNA
-```{r}
+```{r, eval=FALSE}
 write.csv(otu,file="otu.csv")
 ```
 
-#Weighted Gene Correlation Network Analysis
+# Weighted Gene Correlation Network Analysis
 
 Now that we've taken a look at our fungal community data, we'd like to know how the fungal communities relate to soil carbon (C), nitrogen (N), and phosphorus (P). To do this, we use a Weighted Gene Correlation Network Analysis (WGCNA) that will relate the abundance of the genera present in each sample to the C, N, and P of that sample. This analysis will indicate if certain genera are associated with certain soil C, N, and P conditions. 
 
-########################################################################################################
-###################Simmi
-
 Merging count data with Genus IDs and removing outlier samples. OTU cutoff was set really low so that most of the OTUs weren't purged.  
-```{r}
+```{r, warning = FALSE, message= FALSE}
+setwd("/project/bi594/Pine_invasion")
 countData<-read.csv("otu.csv", stringsAsFactors = FALSE)
 colnames(countData)[1] = "Sample_ID"
 
@@ -354,8 +340,8 @@ count.trim$cdat <- NULL
 class(count.trim)
 ```
 
-Transposing data.frame into a matrix and changing column names for the three sites: Plantation, Invaded forest, and Native forest.  
-```{r}
+Transposing data.frame into a matrix and changing column names to indicate the three forest types: Plantation, Invaded forest, and Native forest.  
+```{r, results='hide'}
 t<- t(as.data.frame(lapply(count.trim,as.numeric)))
 colnames(t) <- rownames(count.trim)
 class(t)
@@ -367,13 +353,13 @@ colnames(t) = c("PL1.1", "PL1.2", "PL1.3", "PL1.4", "PL1.5", "UN1.1", "UN1.2", "
 ```
 
 Reading in treatment data and inserting samples from purge outliers. 
-```{r}
+```{r, message= FALSE, warning = FALSE}
+setwd("/project/bi594/Pine_invasion")
 samdf<- read.csv("variabletable_pi.csv")
 rownames(samdf)[samdf$SampleID=='RV55'] 
 samdf.trim <- samdf[-c(21),]
 treat=samdf.trim$site_code
 g=data.frame(treat)
-g
 ```
 
 Creating colData for DESeq.
@@ -387,12 +373,12 @@ nrow(colData)
 Running DeSeq to filter out very low counts
 
 Constructing DESeqDataSet Object. 
-```{r}
+```{r, message= FALSE, warning = FALSE}
 dds<-DESeqDataSetFromMatrix(countData=t, colData=colData, design=~ treat) 
 ```
 
 Calculating geometric means of the counts. Estimating size factors to get the relative library depth of the samples and running DESeq function. 
-```{r}
+```{r, message= FALSE, warning = FALSE}
 gm_mean = function(x, na.rm=TRUE){
   exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
 }
@@ -402,11 +388,9 @@ dds = DESeq(dds, fitType="local")
 ```
 
 Transform the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts. This normalizes with respect to library size. Also making a matrix of our rlog data. 
-```{r}
+```{r, message= FALSE, warning = FALSE}
 rld <- rlogTransformation(dds, blind=TRUE, fitType="local")
-head(rld)
 rld_wg=(assay(rld))
-head(rld_wg)
 nrow(rld_wg)
 ```
 
@@ -416,16 +400,14 @@ write.csv(rld_wg,file="Invasion_wgcna_allgenes2.csv",quote=F,row.names=T)
 ```
 
 Data input and cleaning. Transposing the expression data for further analysis.
-```{r}
+```{r, warning = FALSE, message= FALSE}
 options(stringsAsFactors=FALSE)
 allowWGCNAThreads()
 
+setwd("/project/bi594/Pine_invasion")
 dat=read.csv("Invasion_wgcna_allgenes2.csv")
-head(dat) 
 rownames(dat)<-dat$X
-head(dat)
 dat$X=NULL
-head(dat)
 names(dat)
 nrow(dat)
 
@@ -433,14 +415,14 @@ datExpr0 = as.data.frame(t(dat))
 ```
 
 Reading in trait data and matching the samples to the expression samples for which they were measured (linking things correctly). Also, inserting samples removed from purgeoutliers 
-```{r}
+```{r, warning = FALSE, message= FALSE}
+setwd("/project/bi594/Pine_invasion")
 traitData= read.csv("Invasion_traits_WGCNA.csv")
 rownames(traitData)[traitData$Sample_ID=='RV55'] 
 trait.trim <- traitData[-c(21),]
 rownames(trait.trim) <- trait.trim$Sample_ID
 trait.trim$Sample_ID <- NULL
 dim(trait.trim)
-head(trait.trim)
 names(trait.trim)
 ```
 
@@ -455,11 +437,9 @@ row.names(datTraits)= c("PL1.1", "PL1.2", "PL1.3", "PL1.4", "PL1.5", "UN1.1", "U
 Returns true indicating dataset is aligned correctly.
 ```{r}
 table(rownames(datTraits)==rownames(datExpr0))
-head(datTraits)
-head(datExpr0)
 ```
 
-Clustering the samples by expression to create a sample dendogram and trait heatmap. First whole network connectivity was calculated and standardized. Z.k threshold was set at -2.5 which is common. Trait colors converted such that red illustrates high values.
+Clustering the samples by expression to create a sample dendogram and trait heatmap. First whole network connectivity was calculated and standardized. Trait colors converted such that red illustrates high values.
 ```{r}
 A=adjacency(t(datExpr0))
 
@@ -475,22 +455,23 @@ dimnames(traitColors)[[2]]=paste(names(datTraits))
 datColors=data.frame(outlierC=outlierColor,traitColors)
 ```
 
-```{r message=FALSE, warning=FALSE, fig.cap= "**Figure X. Sample dendogram and trait heat map where red indicates high values. The first band is of outlier Carbon, there were no outliers. The following three bands depict percent nitrogen, percent carbon, and phosphorus respectively.**"}
+```{r message=FALSE, warning=FALSE, fig.cap= "**Figure X. Sample dendogram and trait heat map where red indicates high values. The first band indicates that there were no outliers. The following three bands depict soil percent nitrogen, percent carbon, and bulk phosphorus respectively.**"}
 plotDendroAndColors(sampleTree,groupLabels=names(datColors), colors=datColors,main="Sample dendrogram and trait heatmap")
 ```
-#Network Construction and Module Detection 
+## Network Construction and Module Detection 
 
 Setting our working environment and loading in previously saved expression and trait data. 
-```{r}
+```{r, warning = FALSE, message= FALSE}
 options(stringsAsFactors = FALSE)
+setwd("/project/bi594/Pine_invasion")
 lnames = load(file="Invasion_Samples_Traits_ALL2.RData")
 ```
 
-#Determining the soft power threshold
+## Determining the soft power threshold
 
 The Soft power threshold is the power to which co-expression similarity is raised in order to calculate adjacency. It is standard (according to approximate scale-free topology criterion) to select a soft power threshold that corresponds to a scale free topology model fit (R^2) greater than 0.8. If the value of SFT.R.sq does not reach this threshold within a reasonable power (less than 15 for signed data) then the soft power threshold can be decided based on sample size. 
 
-#https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
 
 First we must set parameters for a set of cadidate soft-threshold powers to plot and visualize scale independence and mean connectivity. 
 ```{r}
@@ -506,7 +487,7 @@ powers = c(seq(1, 10, by = 1), seq(12, 20, by = 2))
 ```
 
 Plotting Scale Independence and Mean Connectivity to determine soft-power threshold based on the sclae free topology index and mean connectivity as functions of the soft power threshold. 
-```{r}
+```{r, results='hide'}
 # Call the network topology analysis function
 sft = pickSoftThreshold(datExpr0, powerVector = powers, networkType="signed", verbose = 2)
 ```
@@ -516,7 +497,7 @@ plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
      xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
      main = paste("Scale independence"));
 text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
-     labels=powers,cex=cex1,col="red");
+     labels=powers, col="red");
 # this line corresponds to using an R^2 cut-off (want it to be between .8 and .9 when selecting sft)
 abline(h=0.90,col="red")
 ```
@@ -526,12 +507,11 @@ abline(h=0.90,col="red")
 plot(sft$fitIndices[,1], sft$fitIndices[,5],
      xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
      main = paste("Mean connectivity"))
-text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, col="red")
 ```
 
 Because our soft power thresholds never seem to be able to reach a signed R^2 of .8, we decide on the softpower threshold of 16 according to our sample size of 29. 
-
-#https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
 
 ```{r}
 softPower=16 
@@ -542,13 +522,11 @@ Then we will construct the adjacency matrix that will be utilized to create our 
 adjacency=adjacency(datExpr0, power=softPower,type="signed") 
 ```
 
-##################Corinne
-############################### INITIAL DENDROGRAM ##############################
-##Create dendrogram
+## Create dendrogram
 Now, we want to visualize how the genera group together based on their abundances across samples. For example, genera that regularly appear together in the same samples will cluster together.
 
 We translate the adjacency into a topological overlap matrix and calculate the corresponding dissimilarity:
-```{r}
+```{r, message=FALSE}
 TOM= TOMsimilarity(adjacency,TOMType = "signed")
 dissTOM= 1-TOM
 ```
@@ -557,12 +535,8 @@ Then, we create the tree that clusters genera together based on similarity in ab
 ```{r}
 library(flashClust)
 geneTree= flashClust(as.dist(dissTOM), method="average") #do we want to change method back to default?
-sizeGrWindow(10,6)
 plot(geneTree, xlab="", sub="", main= "Gene Clustering on TOM-based dissimilarity", labels= FALSE,hang=0.04)
 ```
-
-#*each module gets a number and a size
-#*assign color to each module, color represents clusters of coexpressed genes
 
 Next, we set the smallest number of genera that can be included in a module. We chose 5 because there are 281 genera, so higher than 5 would be a very high percentage of all genera. But, less than 5 would be too few genera to consider a cluster.   
 
@@ -578,13 +552,10 @@ Next, we assign colors to each module and plot the colors below the dendrogram t
 
 ```{r}
 dynamicColors= labels2colors(dynamicMods) #assigning colors to each module
-sizeGrWindow(8,6)
 plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang= 0.05, main= "Gene dendrogram and module colors")
 ```
 
-
-################ MERGING ##############################
-##Merge modules
+## Merge modules
 
 Because some modules have similar genera abundance profiles, we want to merge those modules into one. With gene expression data, an eigengene is calculated for each module, which is a representative expression value for each module. We do the same here, except with abundances instead of gene expression values. 
 
@@ -599,9 +570,8 @@ METree= flashClust(as.dist(MEDiss), method= "average")
 ```
 
 
-
 We reload the saved data:
-```{r}
+```{r, warning = FALSE, message= FALSE}
 setwd("/project/bi594/Pine_invasion")
 lnames <- load(file = "Network_invasion_0.7.RData")
 ```
@@ -609,7 +579,6 @@ lnames <- load(file = "Network_invasion_0.7.RData")
 Then, we plot a tree of the modules and add a line to show where we merge the modules. Any modules below the red line will be merged to the closest branch above the line. We chose 0.7 as the merging height because any value less than 0.7 resulted in many modules with similar abundance patterns. 
 
 ```{r}
-sizeGrWindow(7,6)
 plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
 
 MEDissThres= 0.7 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
@@ -618,7 +587,7 @@ abline(h=MEDissThres, col="red")
 
 The below code executes the actual merging of modules. We then plot the same dendrogram as previously, but with an added annotation below showing the new modules and colors after merging. 
 
-```{r}
+```{r, messages=FALSE}
 merge= mergeCloseModules(datExpr0, dynamicColors, cutHeight= MEDissThres, verbose =1)
 
 mergedColors= merge$colors
@@ -635,9 +604,7 @@ MEs=mergedMEs
 save(MEs, moduleLabels, moduleColors, geneTree, file= "Network_signed_0.7.RData")
 ```
 
-
-#############################################################
-##Relating modules to traits and finding important genes
+## Relating modules to traits and finding important genes
 
 The following setting is important, do not omit:
 ```{r}
@@ -659,8 +626,7 @@ moduleTraitCor = cor(MEs, datTraits, use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
 ```
 
-
-####################### MODULE HEATMAP #####################################
+### Module heatmap
 Now, we want to relate our modules to our traits, which are soil total C, N, and P. To do this, we represent module trait correlations as a heatmap, where each row represents a module and each column represents a trait. If a module is significant for a particular trait, it will show a low p-value (usually significance is considered p<0.05, but because of our low sample size, we will consider p<0.1 to be significant for this assignment). Significance indicates that the genera present in that module are frequently associated with either a high or low value of that trait. 
 
 ```{r}
@@ -703,8 +669,7 @@ names(geneTraitSignificance) = paste("GS.", names(weight), sep="");
 names(GSPvalue) = paste("p.GS.", names(weight), sep="")
 ```
 
-
-##################### MODULE CORRELATION PLOT ####################
+### Module correlation plot
 
 To examine the correlation of the genera in a module to the trait of interest, we create a correlation plot with a module of interest on the x axis and the trait on the y axis. Here, we chose the yellow module with bulk P because the yellow module was significant for bulk P on our module heatmap. We can see in this plot that there is a positive correlation between the module and bulk P. 
 
@@ -712,7 +677,6 @@ To examine the correlation of the genera in a module to the trait of interest, w
 module = "yellow" #*change this to the module we're going to look at
 column = match(module, modNames);
 moduleGenes = moduleColors==module;
-sizeGrWindow(7, 7);
 par(mfrow = c(1,1));
 verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    abs(geneTraitSignificance[moduleGenes, 1]),
@@ -722,8 +686,6 @@ verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 ```
 
-
-########################## VSD FILES BY MODULE ###################### 
 Making VSD files by module - so we can tell what genera are in each module
 
 ```{r}
@@ -738,20 +700,12 @@ Making VSD files by module - so we can tell what genera are in each module
 # write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
 ```
 
-
-#####################KNOW WHICH GENERA ARE IN WHICH MODULE###############
-###fisher for GO
-##########fisher of module vs whole dataset
-#*fisher is binary value of 1  or 0, (1 if in module or 0 if its not)
-#*kME is how well that gene belongs to the module 
-
-#Know which genera are in a given module
+### Identify genera in each module and their kMEs
 
 We now want to know which genera fit best into our module out of all the genera in the module. To do this, we calculate a kME score for all genera, which indicates how well each genus fits into each module. A higher kME indicates a better fit in the module. 
-```{r}
+```{r, warning = FALSE, message= FALSE}
 setwd("/project/bi594/Pine_invasion/")
 vsd <- read.csv("Invasion_wgcna_allgenes2.csv", row.names=1)
-head(vsd)
 options(stringsAsFactors=FALSE)
 data=t(vsd)
 allkME =as.data.frame(signedKME(data, MEs))
@@ -782,21 +736,19 @@ yellow <- row.names(yellow)
 yellow
 ```
 
-midnightblue <- subset(inModule, module=="1")
-midnightblue <- row.names(midnightblue)
-midnightblue
 
-###################### kMEs ###################
-#*this gives kME and input for 
-#*series of how well gene belongs in module
 We then create a dataframe of the kMEs of all the genera for just our module of interest: 
 ```{r}
 modColName=paste("kME",whichModule,sep="")
 modkME=as.data.frame(allkME[,modColName])
 row.names(modkME)=row.names(allkME)
 names(modkME)=modColName
+
+```
+```{r, eval=FALSE}
 write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
 ```
+
 
 From this dataframe, we then subset just the genera in our module of interest:
 ```{r}
@@ -817,11 +769,153 @@ ggplot(data= yellowkme, aes(x=reorder(Genus, -kMEyellow), y=kMEyellow)) +
 
 We can conclude here that these genera are associated with low soil P, and may be drivers of low soil P. The genera with the highest kMEs may be key genera that are driving low soil P: *Meliniomyces*, *Leucosporidium*, and *Densospora*. 
 
+### Heatmaps of module genera abundances by sample
 
-######################## HEATMAP OF GENERA ABUNDANCE BY SAMPLE ###################
-##############################heatmap of module expression with bar plot of eigengene, no resorting of samples...
-#names(dis)
-sizeGrWindow(8,7);
+To see how module genera abundances change between samples, we can create a heatmap showing the abundance of each genus in each sample.  
+```{r}
+which.module="yellow" #*change this also to the color of module we're looking at 
+#pick module of interest
+ME=MEs[, paste("ME",which.module, sep="")]
+genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
+
+#quartz()
+# par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
+par(mfrow=c(2,1), mar=c(0.3, 5.5, 5, 2))
+plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
+par(mar=c(5, 4.2, 0, 0.7))
+barplot(ME, col=which.module, main="", cex.main=2,
+        ylab="Eigengene abundances",xlab="sample")
+```
+**Figure X. Heatmap of genera abundances in each sample in the yellow module and eigengene abundance barplot.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Higher bars in the barplot indicate higher abundances of genera in the yellow module in a given sample. 'PL' samples are from pine plantations, 'UN' samples are from uninvaded eucalypt forests adjacent to invaded forests, and 'INV' are from pine-invaded eucalypt forests.
+
+
+While sample UN2.3 has much higher abundances of genera in the yellow module than all other samples, all samples from the invaded forest in site 2 have relatively high abundances of genera in the yellow module. This indicates that abundance of genera associated with low P varies across forest types.
+
+To see how the abundance of module genera in each sample is associated with the soil P in each sample, we plot the same heatmap as before alongside a barplot of soil P in each sample.  
+```{r}
+which.module="yellow" #pick module of interest
+which.trait="P" #change trait of interest here
+datTraits=datTraits[order((datTraits$P),decreasing=T),]#change trait of interest here
+
+trait=datTraits[, paste(which.trait)]
+genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
+genes=genes[rownames(datTraits),]
+
+#quartz()
+par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
+plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
+par(mar=c(5, 4.2, 0, 0.7))
+barplot(trait, col=which.module, main="", cex.main=2,
+        ylab="bulk P (ug/g)",xlab="sample")#change trait of interest here
+```
+**Figure X. Heatmap of genera abundances in each sample in the yellow module and barplot of bulk soil P.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more bulk P in a soil sample. "PL" samples are from pine plantations, "UN" samples are from uninvaded eucalypt forests adjacent to invaded forests, and "INV" are from pine-invaded eucalypt forests.
+In this figure, we can see that samples with lower bulk P also have higher abundances of genera in the yellow module, confirming the correlation between the yellow module and lower soil P. 
+
+Now, to explore the other significant module, midnightblue, we do the same steps that we did with the yellow module but with %N as the trait of interest. 
+
+```{r}
+weight = as.data.frame(datTraits$percN); #Here, you can change to your trait of interest. We use soil P here.
+names(weight) = "%N" 
+# names (colors) of the modules
+modNames = substring(names(MEs), 3)
+geneModuleMembership = as.data.frame(cor(datExpr0, MEs, use = "p"));
+MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples));
+names(geneModuleMembership) = paste("MM", modNames, sep="");
+names(MMPvalue) = paste("p.MM", modNames, sep="");
+geneTraitSignificance = as.data.frame(cor(datExpr0, weight, use = "p"));
+GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples));
+names(geneTraitSignificance) = paste("GS.", names(weight), sep="");
+names(GSPvalue) = paste("p.GS.", names(weight), sep="")
+```
+
+
+```{r}
+module = "midnightblue" #*change this to the module we're going to look at
+column = match(module, modNames);
+moduleGenes = moduleColors==module;
+par(mfrow = c(1,1));
+verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
+                   abs(geneTraitSignificance[moduleGenes, 1]),
+                   xlab = paste("ModMem in", module, "module"),
+                   ylab = "Sig for %N",
+                   main = paste("MM vs. GS\n"),
+                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+```
+
+Making VSD files by module - so we can tell what genera are in each module
+
+```{r}
+# vs=t(datExpr0)
+# cands=names(datExpr0[moduleColors=="yellow"]) #change this to the color of the module we're looking at
+# #subsetting the genes in this module
+# c.vsd=vs[rownames(vs) %in% cands,]
+# head(c.vsd)
+# nrow(c.vsd) #should correspond to module size
+# table(moduleColors) #check module sizes here
+# head(c.vsd)
+# write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
+```
+
+
+```{r, warning = FALSE, message= FALSE}
+setwd("/project/bi594/Pine_invasion/")
+vsd <- read.csv("Invasion_wgcna_allgenes2.csv", row.names=1)
+options(stringsAsFactors=FALSE)
+data=t(vsd)
+allkME =as.data.frame(signedKME(data, MEs))
+
+```
+
+
+```{r}
+whichModule="midnightblue"
+
+length(moduleColors)
+inModule=data.frame("module"=rep(0,nrow(vsd)))
+row.names(inModule)=row.names(vsd)
+genes=row.names(vsd)[moduleColors == whichModule]
+inModule[genes,1]=1
+sum(inModule[,1]) #this should be the same number of genera that was in the module
+```
+
+```{r, eval=FALSE}
+write.csv(inModule,file=paste(whichModule,"_fisher.csv",sep=""),quote=F)
+```
+
+```{r}
+midnightblue <- subset(inModule, module=="1")
+midnightblue <- row.names(midnightblue)
+midnightblue
+```
+
+```{r}
+modColName=paste("kME",whichModule,sep="")
+modkME=as.data.frame(allkME[,modColName])
+row.names(modkME)=row.names(allkME)
+names(modkME)=modColName
+
+```
+```{r, eval=FALSE}
+write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
+```
+
+```{r}
+mbkmeinput<- paste(midnightblue, sep=",")
+mbkme<- subset(modkME, rownames(modkME) %in% mbkmeinput)
+Genus <- rownames(mbkme)
+rownames(mbkme) <- NULL
+mbkme <- cbind(Genus,mbkme)
+```
+
+```{r}
+ggplot(data= mbkme, aes(x=reorder(Genus, -kMEmidnightblue), y=kMEmidnightblue)) + 
+  geom_bar(fill="midnightblue", stat="identity") +
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
+  labs(x="Genus", y="kME")
+```
+
+
+```{r}
 which.module="midnightblue" #*change this also to the color of module we're looking at 
 #pick module of interest
 ME=MEs[, paste("ME",which.module, sep="")]
@@ -833,16 +927,13 @@ par(mfrow=c(2,1), mar=c(0.3, 5.5, 5, 2))
 plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
 par(mar=c(5, 4.2, 0, 0.7))
 barplot(ME, col=which.module, main="", cex.main=2,
-        ylab="eigengene expression",xlab="sample")
-#this is a cool plot where you can see that genes in this module are upregulated in the pH7.5 treatment
+        ylab="Eigengene abundances",xlab="sample")
+```
 
-###################### HEATMAP OF GENERA ABUNDANCE ORDERED BY TRAIT ##################
-##############################heatmap of module expression with bar plot of trait of interest by sample...
-#*didnt do this in class but may want to create something that ranks phenotype with gene expression (as traits increase or decrease)
-#here we just have binary traits, but if you have a continuous trait this code is cool
-sizeGrWindow(8,7);
+
+```{r}
 which.module="midnightblue" #pick module of interest
-which.trait="percC" #change trait of interest here
+which.trait="percN" #change trait of interest here
 datTraits=datTraits[order((datTraits$percN),decreasing=T),]#change trait of interest here
 
 trait=datTraits[, paste(which.trait)]
@@ -854,39 +945,14 @@ par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
 plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
 par(mar=c(5, 4.2, 0, 0.7))
 barplot(trait, col=which.module, main="", cex.main=2,
-        ylab="%C",xlab="sample")#change trait of interest here
+        ylab="%N",xlab="sample")#change trait of interest here
+```
 
-#*how well it belongs to module
-#Gene relationship to trait and important modules: Gene Significance and Module membership
-allkME =as.data.frame(signedKME(t(dat), MEs))
-head(allkME)
-vsd=read.csv(file="rlog_MMmidnightblue.csv", row.names=1)
-head(vsd)
-library(pheatmap)
-
-################### TOP 100 HEAT MAP #########################
-whichModule="midnightblue" #*color change
-top=100
-datME=MEs
-vsd <- read.csv("Invasion_wgcna_allgenes.csv", row.names=1)
-head(vsd)
-datExpr=t(vsd)
-modcol=paste("kME",whichModule,sep="")
-head(vsd)
-sorted=vsd[order(allkME[,modcol],decreasing=T),]
-hubs=sorted[1:top,]
-# attaching gene names
-summary(hubs)
-
-contrasting = colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
-#quartz()
-setwd("/project/bi594/Pine_invasion/Figures/")
-png(file="pheatmap_midnightblue.png", width=1000, height=1500)
-pheatmap(hubs,scale="row",col=contrasting,border_color=NA, main=paste(whichModule,"kME",sep=""))
-dev.off()
-setwd("/project/bi594/Pine_invasion/")
+We additionally explored the midnight blue module what was significantly positively correlated with %C, but we discounted the correlation because it appears to be driven entirely by one outlier genus. 
 
 
-######--------------------end--------------------#######
+# Conclusion
+
+In conclusion, we found that total N was positively correlated with one module of genera and total P was negatively correlated with another module of genera. With this analysis, we identified key fungal genera that are associated with high N and low P. Furthermore, abundance of the genera associated with low P varied with forest type, indicating that changes in fungal communities with pine invasion are related to changes in soil nutrients with pine invasion. 
 
 
