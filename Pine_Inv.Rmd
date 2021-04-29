@@ -248,23 +248,7 @@ ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE),
 ps
 ```
 
-```{r}
-#Collapse the data in the phyloseq object to genus-level IDs
-glom <- tax_glom(ps, taxrank = 'Genus')
-#Create a dataframe of the OTUs and taxonomic assignments at the genus level
-otu<- data.frame(otu_table(glom))
-tax_table <- data.frame(tax_table(glom))
-#Replace the sequences in the OTU table with corresponding Genus-level IDs
-Genus<- tax_table$Genus
-colnames(otu) <- Genus
-```
-
-Write the OTU that will be used as the input for WGCNA
-```{r}
-write.csv(otu,file="otu.csv")
-```
-
-Generating Abundance Bar plot 
+#Generating Abundance Bar plot 
 
 Selecting the Top 90 most abundant taxa
 ```{r}
@@ -279,18 +263,6 @@ psz <- psmelt(ps)
 write.csv(psz, file="psz.csv")
 psz90 <- psmelt(ps.top90)
 write.csv(psz90, file="top90.csv")
-```
-
-##Assigning Functional Groups 
-
-Assigning functional groups in Funguild and Fun^fun
-```{r}
-funguild_input<- data.frame(taxa)
-funguild_input$OTU <- row.names(funguild_input)  
-funguild_input$Taxonomy <- paste(funguild_input$Kingdom, funguild_input$Phylum, funguild_input$Class, funguild_input$Order, funguild_input$Family, funguild_input$Genus, funguild_input$Species, sep =';')
-funguild_input<- subset(funguild_input, select=-c(Kingdom, Phylum, Class, Order, Family, Genus, Species))
-
-guilds<- funguild_assign(funguild_input)
 ```
 
 Appending the meta-data to the phyloseq data 
@@ -315,6 +287,18 @@ p + geom_bar(stat="identity", colour="black") +
 ggsave("Abundance_Class.png", path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
 ```
 
+Assigning Functional Groups 
+
+Assigning functional groups in Funguild and Fun^fun
+```{r}
+funguild_input<- data.frame(taxa)
+funguild_input$OTU <- row.names(funguild_input)  
+funguild_input$Taxonomy <- paste(funguild_input$Kingdom, funguild_input$Phylum, funguild_input$Class, funguild_input$Order, funguild_input$Family, funguild_input$Genus, funguild_input$Species, sep =';')
+funguild_input<- subset(funguild_input, select=-c(Kingdom, Phylum, Class, Order, Family, Genus, Species))
+
+guilds<- funguild_assign(funguild_input)
+```
+
 Then we add guild annotations onto the abundance data and generate another barplot of abundance by trophic mode
 ```{r}
 fullguild<- merge(fulldf, guilds, by="OTU")
@@ -326,6 +310,23 @@ p2 + geom_bar(stat="identity", colour="black") +
 ```
 ```{r}
 ggsave("Abundance_Trophic.png", plot=p2, path = "/project/bi594/Pine_invasion/Figures/", width=10, height=6, dpi=300)
+```
+
+Collapsing taxonomy in OTU table for WGCNA input 
+```{r}
+#Collapse the data in the phyloseq object to genus-level IDs
+glom <- tax_glom(ps, taxrank = 'Genus')
+#Create a dataframe of the OTUs and taxonomic assignments at the genus level
+otu<- data.frame(otu_table(glom))
+tax_table <- data.frame(tax_table(glom))
+#Replace the sequences in the OTU table with corresponding Genus-level IDs
+Genus<- tax_table$Genus
+colnames(otu) <- Genus
+```
+
+Write the OTU that will be used as the input for WGCNA
+```{r}
+write.csv(otu,file="otu.csv")
 ```
 
 #Weighted Gene Correlation Network Analysis
