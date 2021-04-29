@@ -552,8 +552,9 @@ Next, we assign colors to each module and plot the colors below the dendrogram t
 
 ```{r}
 dynamicColors= labels2colors(dynamicMods) #assigning colors to each module
-plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang= 0.05, main= "Gene dendrogram and module colors")
+plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut", dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang= 0.05, main= "Dendrogram and module colors")
 ```
+**Figure X. Dendrogram and module colors.** Each leaf of the tree corresponds to a genus, and branches grouping together densely are genera that frequently occur together. The colors on the Dynamic Tree Cut band correspond to the module groupings of genera. No modules have been merged. 
 
 ## Merge modules
 
@@ -579,11 +580,12 @@ lnames <- load(file = "Network_invasion_0.7.RData")
 Then, we plot a tree of the modules and add a line to show where we merge the modules. Any modules below the red line will be merged to the closest branch above the line. We chose 0.7 as the merging height because any value less than 0.7 resulted in many modules with similar abundance patterns. 
 
 ```{r}
-plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
+plot(METree, main= "Clustering of module eigen abundances", xlab= "", sub= "")
 
 MEDissThres= 0.7 #*we can change the threshold of our height, merges them different based on value, dont want to overmerge things that arent that similar
 abline(h=MEDissThres, col="red")
 ```
+**Figure X. Tree clustering of module eigen abundances based on similarity.** Each branch of the tree represents a module. The red line shows the height at which we merged modules, which was 0.7.
 
 The below code executes the actual merging of modules. We then plot the same dendrogram as previously, but with an added annotation below showing the new modules and colors after merging. 
 
@@ -648,7 +650,9 @@ labeledHeatmap(Matrix = moduleTraitCor,
                zlim = c(-1,1),
                main = paste("Module-trait relationships"))
 ```
-This heatmap looks good, because we can tell that we did not under-merge our modules. If we had not merged our modules enough, you would see blocks of modules next to each other that have similar profiles (for example, large chunks of blue or red modules together). The top number in each cell indicates the correlation between the module and the trait, and the number in parentheses below the correlation value is the p-value showing significance of the correlation. 
+**Figure X. Heatmap of module-trait relationships.** Each row represents a module and each column represents a trait. Red cells indicate that the genera in that module are positively associated with the trait, and blue cells indicate that the genera in that module are negatively associated with the trait. The top number in each cell indicates the correlation between the module and the trait, and the number in parentheses below the correlation value is the p-value showing significance of the correlation. Significance indicates that the genera present in that module are frequently associated with either a high or low value of that trait. 
+
+This heatmap looks good, because we can tell that we did not under-merge our modules. If we had not merged our modules enough, you would see blocks of modules next to each other that have similar profiles (for example, large chunks of blue or red modules together). 
 
 Here, we can see that the yellow module is significant for P, but negatively associated with P. In other words, genera in this module are frequently associated with low P. The midnight blue module is significant for C and N, where the genera in this module are frequently associated with high C and N. Additionally, P is positively associated with genera that could not be assigned to a module (grey). However, because of the difficulty to interpret significance of unassigned genera, we will not consider the grey module in this analysis. 
 
@@ -671,7 +675,7 @@ names(GSPvalue) = paste("p.GS.", names(weight), sep="")
 
 ### Module correlation plot
 
-To examine the correlation of the genera in a module to the trait of interest, we create a correlation plot with a module of interest on the x axis and the trait on the y axis. Here, we chose the yellow module with bulk P because the yellow module was significant for bulk P on our module heatmap. We can see in this plot that there is a positive correlation between the module and bulk P. 
+To examine the correlation of the genera in a module to the trait of interest, we create a correlation plot with a module of interest on the x axis and the trait on the y axis. Here, we chose the yellow module with bulk P because the yellow module was significant for bulk P on our module heatmap. We can see in this plot that there is a positive correlation between the module and bulk P, so the module is indeed significant. 
 
 ```{r}
 module = "yellow" #*change this to the module we're going to look at
@@ -681,24 +685,11 @@ par(mfrow = c(1,1));
 verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
                    abs(geneTraitSignificance[moduleGenes, 1]),
                    xlab = paste("ModMem in", module, "module"),
-                   ylab = "Sig for bulk P",
+                   ylab = "Genera Sig for bulk P",
                    main = paste("MM vs. GS\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 ```
-
-Making VSD files by module - so we can tell what genera are in each module
-
-```{r}
-# vs=t(datExpr0)
-# cands=names(datExpr0[moduleColors=="yellow"]) #change this to the color of the module we're looking at
-# #subsetting the genes in this module
-# c.vsd=vs[rownames(vs) %in% cands,]
-# head(c.vsd)
-# nrow(c.vsd) #should correspond to module size
-# table(moduleColors) #check module sizes here
-# head(c.vsd)
-# write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
-```
+**Figure X. Scatterplot of genera significance for bulk P vs. genera yellow module membership.** Each point represents one genus in the module. Module membership in the yellow module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. "cor" is the correlation value, and "p" indicates the significance of the correlation. 
 
 ### Identify genera in each module and their kMEs
 
@@ -767,6 +758,8 @@ ggplot(data= yellowkme, aes(x=reorder(Genus, -kMEyellow), y=kMEyellow)) +
   labs(x="Genus", y="kME")
 ```
 
+**Figure X. Barplot of genera in the yellow module vs. their kMEs for the module.** Increasing kME indicates that the genus fits better into the module.
+
 We can conclude here that these genera are associated with low soil P, and may be drivers of low soil P. The genera with the highest kMEs may be key genera that are driving low soil P: *Meliniomyces*, *Leucosporidium*, and *Densospora*. 
 
 ### Heatmaps of module genera abundances by sample
@@ -809,146 +802,39 @@ barplot(trait, col=which.module, main="", cex.main=2,
         ylab="bulk P (ug/g)",xlab="sample")#change trait of interest here
 ```
 **Figure X. Heatmap of genera abundances in each sample in the yellow module and barplot of bulk soil P.** Columns of the heatmap represent samples and rows represent each genus in the yellow module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more bulk P in a soil sample. "PL" samples are from pine plantations, "UN" samples are from uninvaded eucalypt forests adjacent to invaded forests, and "INV" are from pine-invaded eucalypt forests.
+
 In this figure, we can see that samples with lower bulk P also have higher abundances of genera in the yellow module, confirming the correlation between the yellow module and lower soil P. 
 
-Now, to explore the other significant module, midnightblue, we do the same steps that we did with the yellow module but with %N as the trait of interest. 
+### Exploring other significant modules
+Now, to explore the other significant module, midnightblue, we do the same steps that we did with the yellow module but with %N as the trait of interest. We first created a scatter plot of genera significance for %N against the module membership in the midnightblue module. We can see in this plot that there is a positive correlation between the module and %N, so the module is indeed significant. 
 
-```{r}
-weight = as.data.frame(datTraits$percN); #Here, you can change to your trait of interest. We use soil P here.
-names(weight) = "%N" 
-# names (colors) of the modules
-modNames = substring(names(MEs), 3)
-geneModuleMembership = as.data.frame(cor(datExpr0, MEs, use = "p"));
-MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples));
-names(geneModuleMembership) = paste("MM", modNames, sep="");
-names(MMPvalue) = paste("p.MM", modNames, sep="");
-geneTraitSignificance = as.data.frame(cor(datExpr0, weight, use = "p"));
-GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples));
-names(geneTraitSignificance) = paste("GS.", names(weight), sep="");
-names(GSPvalue) = paste("p.GS.", names(weight), sep="")
+```{r echo=FALSE, fig.cap="**Figure X. Scatterplot of genera significance for %N vs. genera midnightblue module membership.** Each point represents one genus in the module. Module membership in the midnightblue module for a given genus is a measure of the correlation of the module eigengene and the genus abundance profile. A tighter positive correlation between module membership and genera significance indicates higher significance of the module. cor is the correlation value, and p indicates the significance of the correlation."}
+knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/scatterplot_midnightblue.png'))
 ```
 
+The plot of kME by genera for the midnightblue module shows which genera are in the module and how well they belong. 
 
-```{r}
-module = "midnightblue" #*change this to the module we're going to look at
-column = match(module, modNames);
-moduleGenes = moduleColors==module;
-par(mfrow = c(1,1));
-verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
-                   abs(geneTraitSignificance[moduleGenes, 1]),
-                   xlab = paste("ModMem in", module, "module"),
-                   ylab = "Sig for %N",
-                   main = paste("MM vs. GS\n"),
-                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+
+```{r echo=FALSE, fig.cap="**Figure X. Barplot of genera in the midnightblue module vs. their kMEs for the module.** Increasing kME indicates that the genus fits better into the module."}
+knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/kME_midnightblue.png'))
 ```
 
-Making VSD files by module - so we can tell what genera are in each module
+We can see here that the genera *Serendipita*, *Ophiosphaerella*, *Basidioascus*, *Melanoleuca*, and *Parengyodontium* may be key genera associated with low soil N. 
 
-```{r}
-# vs=t(datExpr0)
-# cands=names(datExpr0[moduleColors=="yellow"]) #change this to the color of the module we're looking at
-# #subsetting the genes in this module
-# c.vsd=vs[rownames(vs) %in% cands,]
-# head(c.vsd)
-# nrow(c.vsd) #should correspond to module size
-# table(moduleColors) #check module sizes here
-# head(c.vsd)
-# write.csv(c.vsd,"rlog_MMmidnightblue.csv",quote=F)
+We made the same heatmaps as with the yellow module, plotting the genera abundances in each sample alongside the eigengene abundance barplot and soil %N barplot. 
+
+```{r echo=FALSE, fig.cap="**Figure X. Heatmap of genera abundances in each sample in the midnightblue module and eigengene abundance barplot.** Columns of the heatmap represent samples and rows represent each genus in the midnightblue module. Red indicates higher abundance of a genus and light green represents lower abundance. Higher bars in the barplot indicate higher abundances of genera in the midnightblue module in a given sample. PL samples are from pine plantations, UN samples are from uninvaded eucalypt forests adjacent to invaded forests, and INV are from pine-invaded eucalypt forests."}
+knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/abund_heatmap_midnightblue.png'))
 ```
 
-
-```{r, warning = FALSE, message= FALSE}
-setwd("/project/bi594/Pine_invasion/")
-vsd <- read.csv("Invasion_wgcna_allgenes2.csv", row.names=1)
-options(stringsAsFactors=FALSE)
-data=t(vsd)
-allkME =as.data.frame(signedKME(data, MEs))
-
+```{r echo=FALSE, fig.cap="**Figure X. Heatmap of genera abundances in each sample in the midnightblue module and barplot of soil %N.** Columns of the heatmap represent samples and rows represent each genus in the midnightblue module. Red indicates higher abundance of a genus and light green represents lower abundance. Increasing values on the y-axis of the barplot indicate more total N in a soil sample. PL samples are from pine plantations, UN samples are from uninvaded eucalypt forests adjacent to invaded forests, and INV are from pine-invaded eucalypt forests."}
+knitr::include_graphics(path.expand('/project/bi594/Pine_invasion/Figures/trait_heatmap_midnightblue.png'))
 ```
 
-
-```{r}
-whichModule="midnightblue"
-
-length(moduleColors)
-inModule=data.frame("module"=rep(0,nrow(vsd)))
-row.names(inModule)=row.names(vsd)
-genes=row.names(vsd)[moduleColors == whichModule]
-inModule[genes,1]=1
-sum(inModule[,1]) #this should be the same number of genera that was in the module
-```
-
-```{r, eval=FALSE}
-write.csv(inModule,file=paste(whichModule,"_fisher.csv",sep=""),quote=F)
-```
-
-```{r}
-midnightblue <- subset(inModule, module=="1")
-midnightblue <- row.names(midnightblue)
-midnightblue
-```
-
-```{r}
-modColName=paste("kME",whichModule,sep="")
-modkME=as.data.frame(allkME[,modColName])
-row.names(modkME)=row.names(allkME)
-names(modkME)=modColName
-
-```
-```{r, eval=FALSE}
-write.csv(modkME,file=paste(whichModule,"_kME.csv",sep=""),quote=F)
-```
-
-```{r}
-mbkmeinput<- paste(midnightblue, sep=",")
-mbkme<- subset(modkME, rownames(modkME) %in% mbkmeinput)
-Genus <- rownames(mbkme)
-rownames(mbkme) <- NULL
-mbkme <- cbind(Genus,mbkme)
-```
-
-```{r}
-ggplot(data= mbkme, aes(x=reorder(Genus, -kMEmidnightblue), y=kMEmidnightblue)) + 
-  geom_bar(fill="midnightblue", stat="identity") +
-  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) +
-  labs(x="Genus", y="kME")
-```
+In these heatmaps, we can see that the abundance of midnightblue module genera in a sample does not correspond as well with high N as did the yellow module genera with low P. However, we still see some variation in the abundance of genera in the midnight blue module with forest type, with the invaded forest at the second site having higher abundances of midnightblue module genera, indicating that the fungal communities change with pine invasion.
 
 
-```{r}
-which.module="midnightblue" #*change this also to the color of module we're looking at 
-#pick module of interest
-ME=MEs[, paste("ME",which.module, sep="")]
-genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
-
-#quartz()
-# par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
-par(mfrow=c(2,1), mar=c(0.3, 5.5, 5, 2))
-plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
-par(mar=c(5, 4.2, 0, 0.7))
-barplot(ME, col=which.module, main="", cex.main=2,
-        ylab="Eigengene abundances",xlab="sample")
-```
-
-
-```{r}
-which.module="midnightblue" #pick module of interest
-which.trait="percN" #change trait of interest here
-datTraits=datTraits[order((datTraits$percN),decreasing=T),]#change trait of interest here
-
-trait=datTraits[, paste(which.trait)]
-genes=datExpr0[,moduleColors==which.module ] #replace where says subgene below to plot all rather than just subset
-genes=genes[rownames(datTraits),]
-
-#quartz()
-par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
-plotMat(t(scale(genes) ),nrgcols=30,rlabels=F, clabels=rownames(genes), rcols=which.module)
-par(mar=c(5, 4.2, 0, 0.7))
-barplot(trait, col=which.module, main="", cex.main=2,
-        ylab="%N",xlab="sample")#change trait of interest here
-```
-
-We additionally explored the midnight blue module what was significantly positively correlated with %C, but we discounted the correlation because it appears to be driven entirely by one outlier genus. 
+We additionally explored the midnight blue module that was significantly positively correlated with %C, but we discounted the correlation because it appears to be driven entirely by one outlier genus. 
 
 
 # Conclusion
